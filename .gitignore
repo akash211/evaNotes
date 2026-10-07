@@ -1,0 +1,25 @@
+# Rust build artifacts
+target/
+**/*.rs.bk
+
+# Environment & Secrets
+.env
+*.env.local
+
+# Databases & Local runtime data
+data/
+*.db
+*.db-shm
+*.db-wal
+~/.evanotes/
+
+# AI documentation & local knowledge
+AGENTS.md
+.ua/
+
+# IDEs & Operating Systems
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
