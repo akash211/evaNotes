@@ -1,0 +1,12 @@
+target/
+.git/
+.github/
+.env
+.env.*
+!.env.example
+data/
+tests/
+docs/
+*.md
+LICENSE
+.DS_Store
