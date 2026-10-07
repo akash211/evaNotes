@@ -1,0 +1,32 @@
+services:
+  evanotes:
+    image: akashkece/evanotes:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: evanotes
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+      - EVA_DATA_DIR=/data
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - SESSION_SECRET=${SESSION_SECRET:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - SECURE_COOKIES=${SECURE_COOKIES:-false}
+      - ENFORCE_HTTPS=${ENFORCE_HTTPS:-false}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - RUST_LOG=${RUST_LOG:-info}
+    volumes:
+      - eva-data:/data
+
+volumes:
+  eva-data:
+    driver: local
