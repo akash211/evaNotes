@@ -12,7 +12,7 @@ pub use db::DbPool;
 pub use error::{AppError, Result};
 
 use axum::{
-    routing::{get, post},
+    routing::{get, post, put},
     Router,
 };
 use tower_http::trace::TraceLayer;
@@ -33,6 +33,23 @@ pub fn create_app(state: AppState) -> Router {
         .route("/api/auth/google", post(handlers::auth::google_login))
         .route("/api/auth/logout", post(handlers::auth::logout))
         .route("/api/auth/me", get(handlers::protected_me))
+        // Notes endpoints
+        .route(
+            "/api/notes",
+            get(handlers::notes::list_notes).post(handlers::notes::create_note),
+        )
+        .route(
+            "/api/notes/{id}",
+            get(handlers::notes::get_note)
+                .put(handlers::notes::update_note)
+                .delete(handlers::notes::delete_note),
+        )
+        .route("/api/notes/{id}/pin", put(handlers::notes::toggle_pin))
+        .route(
+            "/api/notes/{id}/archive",
+            put(handlers::notes::toggle_archive),
+        )
+        .route("/api/notes/{id}/export", get(handlers::notes::export_note))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

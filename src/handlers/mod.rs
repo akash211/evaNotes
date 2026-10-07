@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod notes;
 
 use crate::auth::AuthUser;
 use axum::{response::IntoResponse, Json};
