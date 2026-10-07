@@ -509,7 +509,7 @@
 
       const data = await res.json();
       state.notes = data.notes || [];
-      state.totalNotes = data.total || 0;
+      state.totalNotes = data.pagination ? data.pagination.total : (data.total || 0);
 
       renderNotesList();
       updateNotesBadge();
@@ -747,7 +747,8 @@
       const res = await api('/api/reminders');
       if (!res.ok) return;
 
-      state.reminders = await res.json();
+      const data = await res.json();
+      state.reminders = data.reminders || (Array.isArray(data) ? data : []);
       renderRemindersList();
       updateRemindersBadge();
       populateNoteSelectDropdown();
@@ -757,7 +758,7 @@
   }
 
   function updateRemindersBadge() {
-    const pendingCount = state.reminders.filter(r => r.status === 'pending' || r.status === 'snoozed').length;
+    const pendingCount = state.reminders.filter(r => (r.state || r.status) === 'pending' || (r.state || r.status) === 'snoozed').length;
     const badge = $('#badge-pending-reminders');
     badge.textContent = pendingCount;
     badge.classList.toggle('badge-alert', pendingCount > 0);
@@ -769,8 +770,9 @@
     list.innerHTML = '';
 
     const filtered = state.reminders.filter(r => {
+      const s = r.state || r.status;
       if (state.reminderFilter === 'all') return true;
-      return r.status === state.reminderFilter;
+      return s === state.reminderFilter;
     });
 
     if (filtered.length === 0) {
@@ -787,10 +789,11 @@
   }
 
   function createReminderRow(rem) {
+    const curState = rem.state || rem.status || 'pending';
     const row = document.createElement('div');
-    row.className = `reminder-row status-${rem.status}`;
+    row.className = `reminder-row status-${curState}`;
 
-    const triggerDate = new Date(rem.trigger_at);
+    const triggerDate = new Date(rem.remind_at || rem.trigger_at);
     const timeFormatted = triggerDate.toLocaleString([], {
       month: 'short',
       day: 'numeric',
@@ -798,8 +801,9 @@
       minute: '2-digit'
     });
 
-    const isRecur = !!rem.recurrence_rule;
-    const statusLabel = rem.status.charAt(0).toUpperCase() + rem.status.slice(1);
+    const isRecur = !!(rem.is_recurring && (rem.cron_expr || rem.recurrence_rule));
+    const cronRule = rem.cron_expr || rem.recurrence_rule;
+    const statusLabel = curState.charAt(0).toUpperCase() + curState.slice(1);
 
     row.innerHTML = `
       <div class="reminder-info">
@@ -807,12 +811,12 @@
         ${rem.description ? `<p class="reminder-desc">${escapeHtml(rem.description)}</p>` : ''}
         <div class="reminder-timing">
           <span>⏰ ${timeFormatted}</span>
-          ${isRecur ? `<span class="badge-recur">🔁 ${escapeHtml(rem.recurrence_rule)}</span>` : ''}
-          <span class="status-chip chip-${rem.status}">${statusLabel}</span>
+          ${isRecur ? `<span class="badge-recur">🔁 ${escapeHtml(cronRule)}</span>` : ''}
+          <span class="status-chip chip-${curState}">${statusLabel}</span>
         </div>
       </div>
       <div class="reminder-actions">
-        ${rem.status !== 'acknowledged' ? `
+        ${curState !== 'acknowledged' ? `
           <button class="btn btn-glass btn-sm btn-rem-snooze" title="Snooze 15 minutes">Snooze 15m</button>
           <button class="btn btn-primary btn-sm btn-rem-ack" title="Mark Acknowledged">Done</button>
         ` : ''}
@@ -912,8 +916,10 @@
     const payload = {
       title,
       description,
-      trigger_at: triggerAt,
-      recurrence_rule: cronRule,
+      remind_at: triggerAt,
+      is_recurring: recurOption !== 'none',
+      cron_expr: cronRule,
+      recur_type: recurOption !== 'none' && recurOption !== 'custom' ? recurOption : null,
       note_id: noteId
     };
 
@@ -942,7 +948,7 @@
     try {
       const res = await api(`/api/reminders/${id}/snooze`, {
         method: 'POST',
-        body: { minutes }
+        body: { duration_minutes: minutes }
       });
       if (res.ok) {
         loadReminders();
@@ -954,7 +960,10 @@
 
   async function acknowledgeReminder(id) {
     try {
-      const res = await api(`/api/reminders/${id}/acknowledge`, { method: 'POST' });
+      const res = await api(`/api/reminders/${id}/acknowledge`, {
+        method: 'POST',
+        body: { action: 'acknowledge' }
+      });
       if (res.ok) {
         loadReminders();
       }
