@@ -122,6 +122,7 @@ cargo test
 | `GOOGLE_CLIENT_ID` | — | Google OAuth 2.0 Client ID |
 | `SECURE_COOKIES` | `false` | Enable `Secure` cookie flag |
 | `ENFORCE_HTTPS` | `false` | Redirect HTTP → HTTPS |
+| `CORS_ORIGINS` | — | Allowed CORS origins (comma-separated, default: same-origin) |
 | `SMTP_HOST` | — | SMTP server hostname |
 | `SMTP_PORT` | `587` | SMTP server port |
 | `SMTP_USER` | — | SMTP username |
