@@ -16,7 +16,10 @@ use axum::{
     routing::{get, post, put},
     Router,
 };
-use tower_http::trace::TraceLayer;
+use tower_http::{
+    services::{ServeDir, ServeFile},
+    trace::TraceLayer,
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -27,6 +30,17 @@ pub struct AppState {
 }
 
 pub fn create_app(state: AppState) -> Router {
+    let static_dir = if std::path::Path::new("src/web/static").is_dir() {
+        "src/web/static"
+    } else if std::path::Path::new("web/static").is_dir() {
+        "web/static"
+    } else {
+        "static"
+    };
+
+    let serve_dir =
+        ServeDir::new(static_dir).fallback(ServeFile::new(format!("{}/index.html", static_dir)));
+
     Router::new()
         // Auth endpoints
         .route("/api/auth/status", get(handlers::auth::auth_status))
@@ -73,6 +87,7 @@ pub fn create_app(state: AppState) -> Router {
         )
         // WebSocket endpoint
         .route("/ws", get(handlers::ws::ws_handler))
+        .fallback_service(serve_dir)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

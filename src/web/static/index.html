@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>evaNotes — Modern Notes & Reminders</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <!-- Ambient background glow elements -->
+  <div class="ambient-glow glow-1"></div>
+  <div class="ambient-glow glow-2"></div>
+  <div class="ambient-glow glow-3"></div>
+
+  <!-- Main Application Wrapper -->
+  <div id="app-container" class="app-layout">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <h2>evaNotes</h2>
+          <span class="version-tag">v0.1.0</span>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="quick-add-group">
+        <button id="btn-quick-simple" class="btn btn-primary btn-add">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>Simple Note</span>
+        </button>
+        <button id="btn-quick-detailed" class="btn btn-glass btn-add">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          <span>Markdown Note</span>
+        </button>
+        <button id="btn-quick-reminder" class="btn btn-glass btn-add">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span>Add Reminder</span>
+        </button>
+      </div>
+
+      <!-- Main Navigation Menu -->
+      <nav class="nav-menu">
+        <div class="nav-section-title">Navigation</div>
+        <button class="nav-item active" data-view="notes-view">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+          <span>All Notes</span>
+          <span id="badge-total-notes" class="counter-badge">0</span>
+        </button>
+
+        <button class="nav-item" data-view="reminders-view">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          <span>Reminders</span>
+          <span id="badge-pending-reminders" class="counter-badge badge-alert">0</span>
+        </button>
+
+        <button class="nav-item" data-view="archived-view">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="21 8 21 21 3 21 3 8"></polyline>
+            <rect x="1" y="3" width="22" height="5"></rect>
+            <line x1="10" y1="12" x2="14" y2="12"></line>
+          </svg>
+          <span>Archive</span>
+        </button>
+      </nav>
+
+      <!-- User Session & Connection Status Footer -->
+      <div class="sidebar-footer">
+        <div class="connection-status" id="ws-indicator" title="Live WebSocket connection">
+          <span class="status-dot"></span>
+          <span class="status-text">Connected</span>
+        </div>
+        <div class="user-profile-badge" id="user-badge">
+          <div class="user-avatar" id="user-avatar-initials">U</div>
+          <div class="user-meta">
+            <span class="user-email" id="user-email-display">user@example.com</span>
+            <span class="user-role" id="user-role-display">Administrator</span>
+          </div>
+          <button id="btn-logout" class="btn-icon" title="Sign Out">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Stage -->
+    <main class="main-content">
+      
+      <!-- Top Header & Search Bar -->
+      <header class="app-header">
+        <div class="search-bar-wrapper">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="input-search" placeholder="Search notes and reminders (press '/' to focus)..." autocomplete="off">
+          <button id="btn-clear-search" class="btn-clear hidden">&times;</button>
+        </div>
+
+        <div class="header-actions">
+          <div class="view-switch-tabs">
+            <button class="tab-btn active" data-filter="all">All</button>
+            <button class="tab-btn" data-filter="simple">Simple</button>
+            <button class="tab-btn" data-filter="detailed">Markdown</button>
+            <button class="tab-btn" data-filter="pinned">📌 Pinned</button>
+          </div>
+        </div>
+      </header>
+
+      <!-- View Container -->
+      <div class="content-body">
+        
+        <!-- Notes View -->
+        <section id="notes-view" class="view-panel active">
+          <div class="view-header">
+            <div>
+              <h1 class="view-title" id="notes-view-title">All Notes</h1>
+              <p class="view-subtitle" id="notes-view-subtitle">Captured thoughts, markdown documents, and quick notes</p>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div id="notes-empty-state" class="empty-state hidden">
+            <div class="empty-icon">📝</div>
+            <h3>No notes found</h3>
+            <p>Create a simple plain text note or a detailed Markdown document to get started.</p>
+            <button class="btn btn-primary" onclick="app.openNoteModal('simple')">+ Create Note</button>
+          </div>
+
+          <!-- Notes Card Grid -->
+          <div id="notes-grid" class="notes-grid"></div>
+
+          <!-- Pagination Controls -->
+          <div id="notes-pagination" class="pagination-bar hidden">
+            <button id="btn-prev-page" class="btn btn-glass">&larr; Previous</button>
+            <span id="pagination-info" class="page-indicator">Page 1 of 1</span>
+            <button id="btn-next-page" class="btn btn-glass">Next &rarr;</button>
+          </div>
+        </section>
+
+        <!-- Reminders View -->
+        <section id="reminders-view" class="view-panel hidden">
+          <div class="view-header">
+            <div>
+              <h1 class="view-title">Reminders & Schedules</h1>
+              <p class="view-subtitle">One-time deadlines, daily standups, and recurring cron alarms</p>
+            </div>
+            <button class="btn btn-primary" onclick="app.openReminderModal()">+ New Reminder</button>
+          </div>
+
+          <!-- Reminder Filter Chips -->
+          <div class="filter-chips-bar">
+            <button class="chip active" data-rem-filter="all">All</button>
+            <button class="chip" data-rem-filter="pending">Pending</button>
+            <button class="chip" data-rem-filter="snoozed">Snoozed</button>
+            <button class="chip" data-rem-filter="acknowledged">Acknowledged</button>
+          </div>
+
+          <div id="reminders-empty-state" class="empty-state hidden">
+            <div class="empty-icon">⏰</div>
+            <h3>No reminders set</h3>
+            <p>Schedule a one-time reminder or a recurring event to keep you on track.</p>
+            <button class="btn btn-primary" onclick="app.openReminderModal()">+ Set Reminder</button>
+          </div>
+
+          <div id="reminders-list" class="reminders-list"></div>
+        </section>
+
+        <!-- Archived Notes View -->
+        <section id="archived-view" class="view-panel hidden">
+          <div class="view-header">
+            <div>
+              <h1 class="view-title">Archived Notes</h1>
+              <p class="view-subtitle">Notes that have been tucked away</p>
+            </div>
+          </div>
+          <div id="archived-grid" class="notes-grid"></div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Note Editor Modal -->
+  <div id="modal-note" class="modal-overlay hidden">
+    <div class="modal-dialog modal-editor">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span id="editor-type-badge" class="type-badge badge-simple">Simple Note</span>
+          <input type="text" id="note-title-input" class="input-bare title-input" placeholder="Note Title...">
+        </div>
+        <div class="modal-controls">
+          <div class="color-picker-group" id="color-picker-group">
+            <button class="color-dot active" data-color="" title="Default"></button>
+            <button class="color-dot" data-color="#6366f1" style="background: #6366f1;" title="Indigo"></button>
+            <button class="color-dot" data-color="#10b981" style="background: #10b981;" title="Emerald"></button>
+            <button class="color-dot" data-color="#f59e0b" style="background: #f59e0b;" title="Amber"></button>
+            <button class="color-dot" data-color="#f43f5e" style="background: #f43f5e;" title="Rose"></button>
+            <button class="color-dot" data-color="#06b6d4" style="background: #06b6d4;" title="Cyan"></button>
+          </div>
+          <button id="btn-export-md" class="btn btn-glass btn-sm" title="Export as .md file">Export .md</button>
+          <button class="btn-close" onclick="app.closeNoteModal()">&times;</button>
+        </div>
+      </div>
+
+      <div class="modal-body editor-body">
+        <!-- Markdown formatting toolbar (visible in detailed mode) -->
+        <div id="markdown-toolbar" class="markdown-toolbar hidden">
+          <button type="button" class="tool-btn" data-insert="# " title="Heading">H</button>
+          <button type="button" class="tool-btn" data-insert="**" data-wrap="true" title="Bold"><strong>B</strong></button>
+          <button type="button" class="tool-btn" data-insert="*" data-wrap="true" title="Italic"><em>I</em></button>
+          <button type="button" class="tool-btn" data-insert="`" data-wrap="true" title="Code"><code>&lt;&gt;</code></button>
+          <button type="button" class="tool-btn" data-insert="- " title="Bullet List">• List</button>
+          <button type="button" class="tool-btn" data-insert="1. " title="Numbered List">1. List</button>
+          <button type="button" class="tool-btn" data-insert="- [ ] " title="Task Checklist">☑ Task</button>
+          <button type="button" class="tool-btn" data-insert="> " title="Blockquote">Quote</button>
+          <button type="button" class="tool-btn" data-insert="[Link](url)" title="Link">Link</button>
+        </div>
+
+        <div class="editor-panes">
+          <!-- Raw content pane -->
+          <div class="pane raw-pane">
+            <textarea id="note-content-input" placeholder="Write your note here... (Markdown supported)"></textarea>
+          </div>
+          <!-- Live Markdown preview pane (visible in detailed mode) -->
+          <div id="preview-pane" class="pane preview-pane markdown-rendered hidden"></div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <div class="footer-left">
+          <button id="btn-delete-note" class="btn btn-danger btn-sm hidden">Delete Note</button>
+          <button id="btn-pin-note" class="btn btn-glass btn-sm">📌 Pin</button>
+          <button id="btn-archive-note" class="btn btn-glass btn-sm">Archive</button>
+        </div>
+        <div class="footer-right">
+          <button class="btn btn-glass" onclick="app.closeNoteModal()">Cancel</button>
+          <button id="btn-save-note" class="btn btn-primary">Save Note</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reminder Modal -->
+  <div id="modal-reminder" class="modal-overlay hidden">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-header">
+        <h3>Schedule Reminder</h3>
+        <button class="btn-close" onclick="app.closeReminderModal()">&times;</button>
+      </div>
+      <div class="modal-body form-layout">
+        <div class="form-group">
+          <label for="rem-title-input">Title</label>
+          <input type="text" id="rem-title-input" class="form-control" placeholder="What do you need to remember?">
+        </div>
+
+        <div class="form-group">
+          <label for="rem-desc-input">Description (Optional)</label>
+          <textarea id="rem-desc-input" class="form-control" rows="2" placeholder="Additional details, checklist, etc."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="rem-time-input">Trigger Date & Time</label>
+          <input type="datetime-local" id="rem-time-input" class="form-control">
+        </div>
+
+        <div class="form-group">
+          <label for="rem-recur-select">Repeat</label>
+          <select id="rem-recur-select" class="form-control">
+            <option value="none">Does not repeat (One-time)</option>
+            <option value="daily">Every day (9:00 AM)</option>
+            <option value="weekly">Every week (Monday 9:00 AM)</option>
+            <option value="monthly">Every month (1st day 9:00 AM)</option>
+            <option value="custom">Custom Cron Expression</option>
+          </select>
+        </div>
+
+        <div id="rem-custom-cron-group" class="form-group hidden">
+          <label for="rem-cron-input">Cron Expression</label>
+          <input type="text" id="rem-cron-input" class="form-control" placeholder="0 9 * * 1-5">
+          <small class="form-hint">Standard 5-field cron: min hour day month weekday</small>
+        </div>
+
+        <div class="form-group">
+          <label for="rem-note-select">Attach to Note (Optional)</label>
+          <select id="rem-note-select" class="form-control">
+            <option value="">No note linked</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-glass" onclick="app.closeReminderModal()">Cancel</button>
+        <button id="btn-save-reminder" class="btn btn-primary">Save Reminder</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Authentication Gateway Modal (shown if unauthenticated) -->
+  <div id="modal-auth" class="modal-overlay hidden">
+    <div class="modal-dialog modal-auth-card">
+      <div class="auth-header">
+        <div class="brand-logo large">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+          </svg>
+        </div>
+        <h2>Welcome to evaNotes</h2>
+        <p>Sign in with your authorized Google Account or Email OTP to manage your notes and reminders.</p>
+      </div>
+
+      <!-- Google Sign-In Container -->
+      <div id="google-auth-container" class="google-auth-section hidden">
+        <div id="g_id_onload"></div>
+        <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
+        <div class="auth-divider"><span>or sign in with email OTP</span></div>
+      </div>
+
+      <!-- Email OTP Flow -->
+      <div class="auth-otp-section">
+        <div id="otp-step-1">
+          <div class="form-group">
+            <label for="auth-email-input">Admin Email</label>
+            <input type="email" id="auth-email-input" class="form-control" placeholder="admin@example.com" autocomplete="email">
+          </div>
+          <button id="btn-request-otp" class="btn btn-primary btn-block">Send Verification Code</button>
+        </div>
+
+        <div id="otp-step-2" class="hidden">
+          <div class="form-group">
+            <label for="auth-code-input">6-Digit Code</label>
+            <input type="text" id="auth-code-input" class="form-control code-input" placeholder="123456" maxlength="6" autocomplete="one-time-code">
+            <small id="otp-instruction" class="form-hint">Code sent to your email (or Docker logs if SMTP is unconfigured).</small>
+          </div>
+          <div class="btn-row">
+            <button id="btn-resend-otp" class="btn btn-glass">Change Email</button>
+            <button id="btn-verify-otp" class="btn btn-primary">Sign In</button>
+          </div>
+        </div>
+
+        <div id="auth-error-msg" class="auth-error hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Real-time Reminder Toast Notification Banner -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Core App Logic -->
+  <script src="/app.js"></script>
+</body>
+</html>
