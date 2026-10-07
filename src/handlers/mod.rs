@@ -1,5 +1,7 @@
 pub mod auth;
 pub mod notes;
+pub mod reminders;
+pub mod ws;
 
 use crate::auth::AuthUser;
 use axum::{response::IntoResponse, Json};

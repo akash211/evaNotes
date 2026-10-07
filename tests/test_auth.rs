@@ -18,10 +18,12 @@ fn setup_test_app(
     config.session_secret = "test-secret-32-chars-long-abcdefghijk".to_string();
 
     let otp_limiter = OtpRateLimiter::new();
+    let hub = evanotes::NotificationHub::new();
     let state = AppState {
         pool: pool.clone(),
         config: config.clone(),
         otp_limiter,
+        hub,
     };
 
     let app = create_app(state);

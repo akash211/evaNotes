@@ -1,4 +1,8 @@
-use evanotes::{auth::OtpRateLimiter, create_app, db::init_db, AppConfig, AppState};
+use evanotes::{
+    auth::OtpRateLimiter, create_app, db::init_db, services::run_reminder_engine, AppConfig,
+    AppState, NotificationHub,
+};
+use std::time::Duration;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[tokio::main]
@@ -23,11 +27,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize database pool & migrations
     let pool = init_db(&config.db_path)?;
     let otp_limiter = OtpRateLimiter::new();
+    let hub = NotificationHub::new();
+
+    // Spawn background reminder scheduler (polling every 10 seconds)
+    let engine_pool = pool.clone();
+    let engine_hub = hub.clone();
+    tokio::spawn(async move {
+        run_reminder_engine(engine_pool, engine_hub, Duration::from_secs(10)).await;
+    });
 
     let state = AppState {
         pool,
         config: config.clone(),
         otp_limiter,
+        hub,
     };
 
     let app = create_app(state);
