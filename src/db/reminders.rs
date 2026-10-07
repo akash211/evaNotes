@@ -3,7 +3,7 @@ use crate::models::reminder::{
     CreateReminderRequest, RecurType, Reminder, ReminderFilter, ReminderState,
     UpdateReminderRequest,
 };
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, params_from_iter, Connection, OptionalExtension, ToSql};
 use uuid::Uuid;
 
 pub fn create_reminder(
@@ -95,26 +95,25 @@ pub fn list_reminders(
     // Total count
     let total: i64 = {
         let mut count_query = String::from("SELECT COUNT(*) FROM reminders WHERE user_id = ?1");
+        let mut count_params: Vec<Box<dyn ToSql>> = vec![Box::new(user_id.to_string())];
+        let mut idx = 1;
+
         if has_state {
-            count_query.push_str(" AND state = ?2");
+            idx += 1;
+            count_query.push_str(&format!(" AND state = ?{idx}"));
+            count_params.push(Box::new(state_str.clone().unwrap()));
         }
         if has_note {
-            count_query.push_str(" AND note_id = ?3");
+            idx += 1;
+            count_query.push_str(&format!(" AND note_id = ?{idx}"));
+            count_params.push(Box::new(note_id.clone()));
         }
         if upcoming_only {
             count_query.push_str(" AND remind_at > datetime('now')");
         }
 
         let mut stmt = conn.prepare(&count_query)?;
-        if has_state && has_note {
-            stmt.query_row(params![user_id, state_str, note_id], |r| r.get(0))?
-        } else if has_state {
-            stmt.query_row(params![user_id, state_str], |r| r.get(0))?
-        } else if has_note {
-            stmt.query_row(params![user_id, note_id], |r| r.get(0))?
-        } else {
-            stmt.query_row(params![user_id], |r| r.get(0))?
-        }
+        stmt.query_row(params_from_iter(count_params.iter()), |r| r.get(0))?
     };
 
     let mut data_query = String::from(
@@ -124,60 +123,57 @@ pub fn list_reminders(
          FROM reminders
          WHERE user_id = ?1",
     );
+    let mut data_params: Vec<Box<dyn ToSql>> = vec![Box::new(user_id.to_string())];
+    let mut idx = 1;
 
     if has_state {
-        data_query.push_str(" AND state = ?2");
+        idx += 1;
+        data_query.push_str(&format!(" AND state = ?{idx}"));
+        data_params.push(Box::new(state_str.unwrap()));
     }
     if has_note {
-        data_query.push_str(" AND note_id = ?3");
+        idx += 1;
+        data_query.push_str(&format!(" AND note_id = ?{idx}"));
+        data_params.push(Box::new(note_id));
     }
     if upcoming_only {
         data_query.push_str(" AND remind_at > datetime('now')");
     }
 
-    data_query.push_str(" ORDER BY remind_at ASC LIMIT ?4 OFFSET ?5");
+    idx += 1;
+    data_query.push_str(&format!(" ORDER BY remind_at ASC LIMIT ?{idx}"));
+    data_params.push(Box::new(limit));
+
+    idx += 1;
+    data_query.push_str(&format!(" OFFSET ?{idx}"));
+    data_params.push(Box::new(offset));
 
     let mut stmt = conn.prepare(&data_query)?;
 
-    let map_row = |row: &rusqlite::Row| {
-        let recur_type_str: Option<String> = row.get(8)?;
-        let s_str: String = row.get(9)?;
+    let rows: Vec<Reminder> = stmt
+        .query_map(params_from_iter(data_params.iter()), |row| {
+            let recur_type_str: Option<String> = row.get(8)?;
+            let s_str: String = row.get(9)?;
 
-        Ok(Reminder {
-            id: row.get(0)?,
-            user_id: row.get(1)?,
-            note_id: row.get(2)?,
-            title: row.get(3)?,
-            description: row.get(4)?,
-            remind_at: row.get(5)?,
-            is_recurring: row.get::<_, i32>(6)? == 1,
-            cron_expr: row.get(7)?,
-            recur_type: recur_type_str.as_deref().and_then(RecurType::from_str_opt),
-            state: ReminderState::from_str_opt(&s_str),
-            snooze_until: row.get(10)?,
-            created_at: row.get(11)?,
-            updated_at: row.get(12)?,
-            last_triggered: row.get(13)?,
-        })
-    };
-
-    let rows: Vec<Reminder> = if has_state && has_note {
-        stmt.query_map(params![user_id, state_str, note_id, limit, offset], map_row)?
-            .filter_map(std::result::Result::ok)
-            .collect()
-    } else if has_state {
-        stmt.query_map(params![user_id, state_str, limit, offset], map_row)?
-            .filter_map(std::result::Result::ok)
-            .collect()
-    } else if has_note {
-        stmt.query_map(params![user_id, note_id, limit, offset], map_row)?
-            .filter_map(std::result::Result::ok)
-            .collect()
-    } else {
-        stmt.query_map(params![user_id, limit, offset], map_row)?
-            .filter_map(std::result::Result::ok)
-            .collect()
-    };
+            Ok(Reminder {
+                id: row.get(0)?,
+                user_id: row.get(1)?,
+                note_id: row.get(2)?,
+                title: row.get(3)?,
+                description: row.get(4)?,
+                remind_at: row.get(5)?,
+                is_recurring: row.get::<_, i32>(6)? == 1,
+                cron_expr: row.get(7)?,
+                recur_type: recur_type_str.as_deref().and_then(RecurType::from_str_opt),
+                state: ReminderState::from_str_opt(&s_str),
+                snooze_until: row.get(10)?,
+                created_at: row.get(11)?,
+                updated_at: row.get(12)?,
+                last_triggered: row.get(13)?,
+            })
+        })?
+        .filter_map(std::result::Result::ok)
+        .collect();
 
     Ok((rows, total))
 }

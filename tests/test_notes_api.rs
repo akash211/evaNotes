@@ -30,10 +30,12 @@ fn setup_test_env() -> (TestServer, String, String, tempfile::TempDir) {
     };
 
     let otp_limiter = OtpRateLimiter::new();
+    let hub = evanotes::NotificationHub::new();
     let state = AppState {
         pool,
         config,
         otp_limiter,
+        hub,
     };
 
     let app = create_app(state);

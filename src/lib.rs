@@ -10,6 +10,7 @@ pub use auth::OtpRateLimiter;
 pub use config::AppConfig;
 pub use db::DbPool;
 pub use error::{AppError, Result};
+pub use services::NotificationHub;
 
 use axum::{
     routing::{get, post, put},
@@ -22,6 +23,7 @@ pub struct AppState {
     pub pool: DbPool,
     pub config: AppConfig,
     pub otp_limiter: OtpRateLimiter,
+    pub hub: NotificationHub,
 }
 
 pub fn create_app(state: AppState) -> Router {
@@ -50,6 +52,27 @@ pub fn create_app(state: AppState) -> Router {
             put(handlers::notes::toggle_archive),
         )
         .route("/api/notes/{id}/export", get(handlers::notes::export_note))
+        // Reminders endpoints
+        .route(
+            "/api/reminders",
+            get(handlers::reminders::list_reminders).post(handlers::reminders::create_reminder),
+        )
+        .route(
+            "/api/reminders/{id}",
+            get(handlers::reminders::get_reminder)
+                .put(handlers::reminders::update_reminder)
+                .delete(handlers::reminders::delete_reminder),
+        )
+        .route(
+            "/api/reminders/{id}/snooze",
+            post(handlers::reminders::snooze_reminder),
+        )
+        .route(
+            "/api/reminders/{id}/acknowledge",
+            post(handlers::reminders::acknowledge_reminder),
+        )
+        // WebSocket endpoint
+        .route("/ws", get(handlers::ws::ws_handler))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

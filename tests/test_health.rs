@@ -6,11 +6,13 @@ async fn test_health_check_status_endpoint() {
     let pool = init_memory_db().expect("Failed to initialize test DB");
     let config = AppConfig::from_env();
     let otp_limiter = OtpRateLimiter::new();
+    let hub = evanotes::NotificationHub::new();
 
     let state = AppState {
         pool,
         config,
         otp_limiter,
+        hub,
     };
 
     let app = create_app(state);
