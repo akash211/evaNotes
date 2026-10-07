@@ -1,10 +1,19 @@
 use axum_test::TestServer;
-use evanotes::{create_app, AppConfig};
+use evanotes::{auth::OtpRateLimiter, create_app, db::init_memory_db, AppConfig, AppState};
 
 #[tokio::test]
 async fn test_health_check_status_endpoint() {
+    let pool = init_memory_db().expect("Failed to initialize test DB");
     let config = AppConfig::from_env();
-    let app = create_app(config);
+    let otp_limiter = OtpRateLimiter::new();
+
+    let state = AppState {
+        pool,
+        config,
+        otp_limiter,
+    };
+
+    let app = create_app(state);
     let server = TestServer::new(app).expect("Failed to create test server");
 
     let response = server.get("/api/auth/status").await;
