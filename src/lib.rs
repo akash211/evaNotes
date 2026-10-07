@@ -13,13 +13,51 @@ pub use error::{AppError, Result};
 pub use services::NotificationHub;
 
 use axum::{
+    extract::{DefaultBodyLimit, Request},
+    http::{
+        header::{HeaderName, HeaderValue},
+        Method,
+    },
+    middleware::{self, Next},
+    response::Response,
     routing::{get, post, put},
     Router,
 };
 use tower_http::{
+    cors::CorsLayer,
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
 };
+
+async fn security_headers_middleware(req: Request, next: Next) -> Response {
+    let mut response = next.run(req).await;
+    let headers = response.headers_mut();
+
+    headers.insert(
+        HeaderName::from_static("x-content-type-options"),
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        HeaderName::from_static("x-frame-options"),
+        HeaderValue::from_static("DENY"),
+    );
+    headers.insert(
+        HeaderName::from_static("x-xss-protection"),
+        HeaderValue::from_static("0"),
+    );
+    headers.insert(
+        HeaderName::from_static("referrer-policy"),
+        HeaderValue::from_static("strict-origin-when-cross-origin"),
+    );
+    headers.insert(
+        HeaderName::from_static("content-security-policy"),
+        HeaderValue::from_static(
+            "default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' ws: wss:; frame-src https://accounts.google.com;",
+        ),
+    );
+
+    response
+}
 
 #[derive(Clone)]
 pub struct AppState {
@@ -40,6 +78,26 @@ pub fn create_app(state: AppState) -> Router {
 
     let serve_dir =
         ServeDir::new(static_dir).fallback(ServeFile::new(format!("{}/index.html", static_dir)));
+
+    let mut cors = CorsLayer::new()
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
+        .allow_headers(tower_http::cors::Any);
+
+    if !state.config.cors_origins.is_empty() {
+        let origins: Vec<HeaderValue> = state
+            .config
+            .cors_origins
+            .iter()
+            .filter_map(|o| o.parse().ok())
+            .collect();
+        cors = cors.allow_origin(origins);
+    }
 
     Router::new()
         // Auth endpoints
@@ -88,6 +146,9 @@ pub fn create_app(state: AppState) -> Router {
         // WebSocket endpoint
         .route("/ws", get(handlers::ws::ws_handler))
         .fallback_service(serve_dir)
+        .layer(middleware::from_fn(security_headers_middleware))
+        .layer(DefaultBodyLimit::max(1024 * 1024))
+        .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

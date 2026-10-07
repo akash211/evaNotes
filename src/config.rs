@@ -17,6 +17,7 @@ pub struct AppConfig {
     pub smtp_user: Option<String>,
     pub smtp_password: Option<String>,
     pub smtp_from: Option<String>,
+    pub cors_origins: Vec<String>,
 }
 
 impl AppConfig {
@@ -96,6 +97,16 @@ impl AppConfig {
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
 
+        let cors_origins: Vec<String> = std::env::var("CORS_ORIGINS")
+            .ok()
+            .map(|s| {
+                s.split(',')
+                    .map(|item| item.trim().to_string())
+                    .filter(|item| !item.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default();
+
         Self {
             host,
             port,
@@ -112,6 +123,7 @@ impl AppConfig {
             smtp_user,
             smtp_password,
             smtp_from,
+            cors_origins,
         }
     }
 }
