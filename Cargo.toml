@@ -1,0 +1,49 @@
+[package]
+name = "evanotes"
+version = "0.1.0"
+edition = "2021"
+authors = ["Akash Kumar <akash211@gmail.com>"]
+description = "A secure, self-hosted Notes & Reminder application built with Rust"
+license = "MIT"
+
+[dependencies]
+# Web framework & async runtime
+axum = { version = "0.8", features = ["ws", "macros"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["fs", "cors", "trace", "set-header"] }
+tokio = { version = "1.43", features = ["full"] }
+
+# Serialization & Data
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.13", features = ["v4", "serde"] }
+
+# Database
+rusqlite = { version = "0.33", features = ["bundled", "chrono", "uuid"] }
+r2d2 = "0.8"
+r2d2_sqlite = "0.26"
+refinery = { version = "0.8", features = ["rusqlite"] }
+
+# Security & Cryptography
+hmac = "0.12"
+sha2 = "0.10"
+rand = "0.8"
+subtle = "2.6"
+
+# Networking & Auth
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "rustls-tls", "builder"] }
+
+# Markdown & Scheduling
+pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }
+cron = "0.15"
+
+# Utilities & Config
+dotenvy = "0.15"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+[dev-dependencies]
+axum-test = "17.0"
+tempfile = "3.17"
