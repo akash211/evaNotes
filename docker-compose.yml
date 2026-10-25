@@ -34,6 +34,7 @@ services:
       # Version history tuning
       - VERSION_MIN_INTERVAL_SECS=${VERSION_MIN_INTERVAL_SECS:-900}
       - VERSION_MAX_KEEP=${VERSION_MAX_KEEP:-10}
+      - OTP_RATE_LIMIT_MAX=${OTP_RATE_LIMIT_MAX:-5}
       - RUST_LOG=${RUST_LOG:-info}
     volumes:
       - eva-data:/data
