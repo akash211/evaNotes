@@ -28,7 +28,7 @@ Public. Reports auth + feature availability.
 {
   "status": "ok",
   "app": "evaNotes",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "authenticated": true,
   "email": "you@example.com",
   "is_admin": true,

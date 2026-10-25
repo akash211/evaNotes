@@ -1,6 +1,6 @@
 [package]
 name = "evanotes"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Akash Kumar <akash211@gmail.com>"]
 description = "A secure, self-hosted Notes & Reminder application built with Rust"

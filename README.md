@@ -45,7 +45,7 @@
 ```yaml
 services:
   evanotes:
-    image: akashkece/evanotes:0.1.0
+    image: akashkece/evanotes:0.1.1
     container_name: evanotes
     restart: unless-stopped
     ports:

@@ -19,6 +19,26 @@ pub fn telegram_configured(config: &AppConfig) -> bool {
     config.telegram_bot_token.is_some() && config.telegram_chat_id.is_some()
 }
 
+/// Build an SMTP transport with the correct TLS mode for the configured port:
+/// implicit TLS (SMTPS) on 465, STARTTLS everywhere else (typically 587).
+pub fn build_smtp_transport(config: &AppConfig) -> Result<SmtpTransport> {
+    let host = config.smtp_host.as_deref().unwrap_or_default();
+    let user = config.smtp_user.as_deref().unwrap_or_default();
+    let password = config.smtp_password.as_deref().unwrap_or_default();
+
+    let builder = if config.smtp_port == 465 {
+        SmtpTransport::relay(host)
+    } else {
+        SmtpTransport::starttls_relay(host)
+    }
+    .map_err(|e| AppError::Internal(format!("Failed to configure SMTP relay: {e}")))?;
+
+    Ok(builder
+        .port(config.smtp_port)
+        .credentials(Credentials::new(user.to_string(), password.to_string()))
+        .build())
+}
+
 fn reminder_body(reminder: &Reminder) -> String {
     let mut body = format!("⏰ evaNotes Reminder\n\n📌 {}\n", reminder.title);
     if let Some(desc) = reminder
@@ -49,12 +69,7 @@ pub async fn send_email_reminder(
         ));
     }
 
-    let (host, user, password, from) = (
-        config.smtp_host.as_deref().unwrap_or_default(),
-        config.smtp_user.as_deref().unwrap_or_default(),
-        config.smtp_password.as_deref().unwrap_or_default(),
-        config.smtp_from.as_deref().unwrap_or_default(),
-    );
+    let (from,) = (config.smtp_from.as_deref().unwrap_or_default(),);
 
     let email = Message::builder()
         .from(
@@ -69,12 +84,7 @@ pub async fn send_email_reminder(
         .body(reminder_body(reminder))
         .map_err(|e| AppError::Internal(format!("Failed to build email message: {e}")))?;
 
-    let creds = Credentials::new(user.to_string(), password.to_string());
-    let mailer = SmtpTransport::relay(host)
-        .map_err(|e| AppError::Internal(format!("Failed to configure SMTP relay: {e}")))?
-        .port(config.smtp_port)
-        .credentials(creds)
-        .build();
+    let mailer = build_smtp_transport(config)?;
 
     mailer
         .send(&email)

@@ -1,9 +1,7 @@
 use crate::config::AppConfig;
 use crate::error::{AppError, Result};
-use lettre::{
-    message::header::ContentType, transport::smtp::authentication::Credentials, Message,
-    SmtpTransport, Transport,
-};
+use crate::services::notify::build_smtp_transport;
+use lettre::{message::header::ContentType, Message, Transport};
 use rand::Rng;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -64,7 +62,7 @@ impl OtpRateLimiter {
 }
 
 pub async fn send_otp_email(config: &AppConfig, to_email: &str, code: &str) -> Result<()> {
-    if let (Some(host), Some(user), Some(password), Some(from)) = (
+    if let (Some(_host), Some(_user), Some(_password), Some(from)) = (
         &config.smtp_host,
         &config.smtp_user,
         &config.smtp_password,
@@ -85,12 +83,7 @@ pub async fn send_otp_email(config: &AppConfig, to_email: &str, code: &str) -> R
             ))
             .map_err(|e| AppError::Internal(format!("Failed to build email message: {e}")))?;
 
-        let creds = Credentials::new(user.clone(), password.clone());
-        let mailer = SmtpTransport::relay(host)
-            .map_err(|e| AppError::Internal(format!("Failed to configure SMTP relay: {e}")))?
-            .port(config.smtp_port)
-            .credentials(creds)
-            .build();
+        let mailer = build_smtp_transport(config)?;
 
         mailer
             .send(&email)
