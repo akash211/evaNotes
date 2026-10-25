@@ -46,7 +46,7 @@ pub async fn ws_handler(
 
 async fn handle_socket(socket: WebSocket, state: AppState, user_id: String) {
     let (mut sender, mut receiver) = socket.split();
-    let mut rx = state.hub.subscribe();
+    let mut rx = state.hub.subscribe(&user_id);
 
     // Spawn a task to forward broadcast messages to this client
     let mut send_task = tokio::spawn(async move {

@@ -1,536 +1,410 @@
 # evaNotes — API Reference
 
-> REST API + WebSocket endpoint for notes, reminders, and authentication.
+> REST + WebSocket API for notes, tags, reminders, and authentication.
 
 **Base URL**: `http://localhost:8080`
+
+All `/api/*` endpoints except the auth endpoints require a valid session.
+Sessions are delivered as `Set-Cookie: session=…` (HttpOnly, SameSite=Strict) and may
+alternatively be sent as `Authorization: Bearer <token>`.
+
+**Error body shape** (non-2xx):
+
+```json
+{ "error": "unauthorized|bad_request|rate_limited|not_found|forbidden|conflict|internal_error", "message": "…" }
+```
+
+`429` responses include a `Retry-After` header.
 
 ---
 
 ## 1. Authentication
 
-All endpoints under `/api/*` (except auth endpoints) require a valid session. Sessions are managed via HTTP-only cookies set on successful login.
+### `GET /api/auth/status`
 
-### Error Responses (Auth)
+Public. Reports auth + feature availability.
 
-| Status | Body | Meaning |
-|:---|:---|:---|
-| `401` | `{"error": "unauthorized"}` | Missing or invalid session token |
-| `429` | `{"error": "rate_limited", "retry_after": 60}` | Too many requests (OTP endpoints: 2/min/IP) |
-
----
-
-### `POST /api/auth/google`
-
-Verify a Google OAuth ID token and create a session.
-
-**Request:**
 ```json
 {
-  "id_token": "eyJhbGciOiJSUzI1NiIs..."
+  "status": "ok",
+  "app": "evaNotes",
+  "version": "0.1.0",
+  "authenticated": true,
+  "email": "you@example.com",
+  "is_admin": true,
+  "user_id": "uuid",
+  "google_login_enabled": false,
+  "google_client_id": null,
+  "telegram_enabled": false,
+  "email_enabled": false
 }
 ```
 
-**Response (200):**
+### `GET /api/auth/me` — 🔒
+
 ```json
-{
-  "status": "authenticated",
-  "email": "user@gmail.com",
-  "auth_method": "google"
-}
+{ "status": "ok", "user_id": "uuid", "email": "you@example.com", "is_admin": true }
 ```
-*Also sets `Set-Cookie: session=<token>; HttpOnly; SameSite=Strict; Path=/`*
-
-**Errors:** `401` (token invalid or email not authorized), `400` (missing id_token)
-
----
 
 ### `POST /api/auth/otp/request`
 
-Request a one-time password sent to the configured admin email.
-
-**Request:**
 ```json
-{
-  "email": "admin@example.com"
-}
+{ "email": "you@example.com" }
 ```
+→ `200 {"status":"otp_sent","message":"A 6-digit verification code has been dispatched."}`
 
-**Response (200):**
-```json
-{
-  "status": "otp_sent",
-  "message": "A 6-digit code has been sent to your email"
-}
-```
-
-**Errors:** `401` (email not authorized), `429` (rate limited)
-
-> **Note:** If SMTP is not configured, the OTP is logged to stdout/Docker logs: `[evaNotes AUTH] Login OTP for admin@example.com: 123456`
-
----
+- `401` if `ADMIN_EMAIL` is set and the email does not match.
+- `429` after `OTP_RATE_LIMIT_MAX` (default 5) requests per IP per 60 s, with a `Retry-After` header.
+- If SMTP is unconfigured the code is printed to the server log:
+  `[evaNotes AUTH] Login OTP for you@example.com: 123456`
 
 ### `POST /api/auth/otp/verify`
 
-Verify an OTP code and create a session.
-
-**Request:**
 ```json
-{
-  "email": "admin@example.com",
-  "code": "123456"
-}
+{ "email": "you@example.com", "code": "123456" }
 ```
+→ `200` with session cookie set:
 
-**Response (200):**
 ```json
 {
   "status": "authenticated",
-  "email": "admin@example.com",
-  "auth_method": "otp"
+  "email": "you@example.com",
+  "auth_method": "otp",
+  "is_admin": true,
+  "user_id": "uuid",
+  "token": "…"
 }
 ```
 
-**Errors:** `401` (invalid/expired code or max attempts exceeded), `429` (rate limited)
+Codes expire after 5 minutes, are single-use, and lock after 5 wrong attempts.
 
----
+### `POST /api/auth/google`
+
+```json
+{ "id_token": "…" }
+```
+→ `200`, same response shape as OTP verify (flat object + `Set-Cookie`).
 
 ### `POST /api/auth/logout`
 
-Destroy the current session.
-
-**Response (200):**
-```json
-{
-  "status": "logged_out"
-}
-```
-
----
-
-### `GET /api/auth/status`
-
-Check if the current session is valid. Also serves as the health check endpoint.
-
-**Response (200):**
-```json
-{
-  "authenticated": true,
-  "email": "admin@example.com"
-}
-```
-
-**Response (200, unauthenticated):**
-```json
-{
-  "authenticated": false
-}
-```
+→ `200 {"status":"logged_out"}` + cookie invalidation.
 
 ---
 
 ## 2. Notes
 
-All notes endpoints require authentication.
+### Note object
 
-### `GET /api/notes`
-
-List notes with pagination, search, and filters.
-
-**Query Parameters:**
-
-| Param | Type | Default | Description |
-|:---|:---|:---|:---|
-| `page` | int | `1` | Page number (1-indexed) |
-| `limit` | int | `20` | Notes per page (max 100) |
-| `search` | string | — | Full-text search in title and content |
-| `type` | string | — | Filter by `simple` or `detailed` |
-| `archived` | bool | `false` | Include archived notes |
-| `pinned` | bool | — | Filter pinned notes only |
-| `sort` | string | `updated_at` | Sort field: `updated_at`, `created_at`, `title` |
-| `order` | string | `desc` | Sort order: `asc` or `desc` |
-
-**Response (200):**
 ```json
 {
-  "notes": [
-    {
-      "id": "550e8400-e29b-41d4-a716-446655440000",
-      "title": "Meeting Notes",
-      "content": "# Agenda\n- Item 1\n- Item 2",
-      "note_type": "detailed",
-      "is_pinned": true,
-      "is_archived": false,
-      "color": "#6366f1",
-      "created_at": "2026-10-07T18:00:00Z",
-      "updated_at": "2026-10-07T19:30:00Z",
-      "reminder_count": 1
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 42,
-    "total_pages": 3
-  }
-}
-```
-
----
-
-### `POST /api/notes`
-
-Create a new note.
-
-**Request:**
-```json
-{
-  "title": "Quick Todo",
-  "content": "Buy groceries",
-  "note_type": "simple",
-  "color": "#10b981"
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440001",
-  "title": "Quick Todo",
-  "content": "Buy groceries",
-  "note_type": "simple",
+  "id": "uuid",
+  "user_id": "uuid",
+  "title": "K8s cheatsheet",
+  "content": "# kubectl\nkubectl get pods",
+  "note_type": "simple | detailed | code | sheet",
   "is_pinned": false,
   "is_archived": false,
-  "color": "#10b981",
-  "created_at": "2026-10-07T20:00:00Z",
-  "updated_at": "2026-10-07T20:00:00Z"
-}
-```
-
-**Errors:** `400` (validation error), `413` (content too large, max 1MB)
-
----
-
-### `GET /api/notes/:id`
-
-Get a single note by ID. For `detailed` notes, includes rendered HTML.
-
-**Response (200):**
-```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "title": "Meeting Notes",
-  "content": "# Agenda\n- Item 1\n- Item 2",
-  "content_html": "<h1>Agenda</h1>\n<ul><li>Item 1</li><li>Item 2</li></ul>",
-  "note_type": "detailed",
-  "is_pinned": true,
-  "is_archived": false,
+  "is_deleted": false,
   "color": "#6366f1",
-  "created_at": "2026-10-07T18:00:00Z",
-  "updated_at": "2026-10-07T19:30:00Z",
-  "reminders": [
-    {
-      "id": "660e8400-e29b-41d4-a716-446655440000",
-      "title": "Review meeting notes",
-      "remind_at": "2026-10-08T09:00:00Z",
-      "state": "pending"
-    }
-  ]
+  "icon": "🚀",
+  "folder_id": null,
+  "folder_name": "Work",
+  "tags": ["kubernetes", "devops"],
+  "created_at": "2026-10-23 19:37:06",
+  "updated_at": "2026-10-23 19:37:06",
+  "deleted_at": null,
+  "reminder_count": 1
 }
 ```
 
-**Errors:** `404` (note not found or belongs to another user)
+### `GET /api/notes` — 🔒
 
----
+Query params:
 
-### `PUT /api/notes/:id`
+| Param | Type | Meaning |
+|:--|:--|:--|
+| `page`, `limit` | int | pagination (default 1 / 20, max 100) |
+| `search` | string | search query (all scopes by default) |
+| `search_in` | `title,content,tags,folders` (comma list) | limit which parts the search matches |
+| `type` | `simple\|detailed\|code\|sheet` | note type filter |
+| `archived` | bool | show archived only |
+| `pinned` | bool | pinned only |
+| `tag` | `a,b` (comma list) | notes carrying ALL these tags |
+| `folder` | folder id \| `root` | notes in this folder **and its subfolders** (`root` = no folder) |
 
-Update a note. Partial updates supported (only include fields to change).
-
-**Request:**
 ```json
-{
-  "title": "Updated Title",
-  "content": "Updated content"
-}
+{ "notes": [ …Note… ], "pagination": { "page": 1, "limit": 20, "total": 3, "total_pages": 1 } }
 ```
 
-**Response (200):** Updated note object (same shape as GET response, without `content_html`)
+### `POST /api/notes` — 🔒
 
-**Errors:** `404`, `400`, `413`
+```json
+{ "title": "…", "content": "…", "note_type": "detailed", "color": "#6366f1",
+  "icon": "🚀", "folder_id": "…", "tags": ["kubernetes"] }
+```
+→ `201` with the created Note (tags auto-created when unknown). Content limit: 1 MB.
 
----
+### `GET /api/notes/{id}?device=dev-id` — 🔒
 
-### `DELETE /api/notes/:id`
-
-Soft-delete a note. Sets `is_deleted = 1` and `deleted_at`.
-
-**Response (200):**
 ```json
 {
-  "status": "deleted",
-  "id": "550e8400-e29b-41d4-a716-446655440000"
+  "note": { …Note… },
+  "content_html": "…",
+  "active_editors": [ { "device": "phone-a", "since": "12s ago" } ]
 }
 ```
+`content_html` is server-rendered (Markdown / highlighted code), XSS-sanitized.
+`active_editors` lists other devices that currently have the note open.
+
+### `PUT /api/notes/{id}` — 🔒
+
+Partial update: `title, content, note_type, color, icon, is_pinned, is_archived, tags`.
+`folder_id` is tri-state: absent = unchanged, `null` = move to top level, id = move into folder.
+Every update snapshots the previous state into the version history (throttled).
+
+### `DELETE /api/notes/{id}` — 🔒
+
+Soft delete → `200 {"status":"deleted","id":"…"}`.
+
+### `PUT /api/notes/{id}/pin` / `PUT /api/notes/{id}/archive` — 🔒
+
+Toggle → `{"id":"…","is_pinned":true}` / `{"id":"…","is_archived":true}`.
+
+### `PUT /api/notes/{id}/tags` — 🔒
+
+```json
+{ "tags": ["kubernetes", "infra"] }
+```
+→ `200 {"id":"…","tags":["kubernetes","infra"]}`. Replaces the tag set; unknown tags are auto-created.
+
+### `GET /api/notes/{id}/export?format=md|pdf` — 🔒
+
+- `md` (default): `text/markdown` attachment
+- `pdf`: `application/pdf` attachment
 
 ---
 
-### `PUT /api/notes/:id/pin`
+## 2b. Versions, presence, sharing
 
-Toggle pin status.
+### `GET /api/notes/{id}/versions` — 🔒
 
-**Response (200):**
+`{"versions":[{"id":1,"note_id":"…","title":"…","content":"…","note_type":"…","created_at":"…"}]}`
+Newest first. Automatic snapshots, at least `VERSION_MIN_INTERVAL_SECS` apart, max `VERSION_MAX_KEEP`.
+
+### `POST /api/notes/{id}/versions/clear` — 🔒
+
+→ `{"status":"cleared","deleted":N}`.
+
+### `POST /api/notes/{id}/restore` — 🔒
+
 ```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "is_pinned": true
-}
+{ "version_id": 3 }
+```
+→ `{"status":"restored","note":{…}}` (the pre-restore state is itself snapshotted first).
+
+### `POST /api/notes/{id}/presence` — 🔒 / `DELETE` — 🔒
+
+```json
+{ "device": "phone-a" }
+```
+POST = heartbeat (keep-alive every ~30s), returns `{"status":"ok","active_editors":[…]}`
+for *other* devices. DELETE = device closed the note. Stale entries (75s) are pruned.
+
+### `GET/POST/DELETE /api/notes/{id}/share` — 🔒
+
+- GET → `{"share": {"id":"slug","mode":"live|snapshot","path":"/share/slug", …} | null}`
+- POST `{ "mode": "snapshot" | "live" }` → creates/updates the note's share link
+- DELETE → revokes the link
+
+### Public share pages (no auth)
+
+| Route | Returns |
+|:--|:--|
+| `GET /share/{slug}` | self-contained HTML page (rendered note + download buttons) |
+| `GET /share/{slug}/md` | Markdown download |
+| `GET /share/{slug}/pdf` | PDF download |
+
+Snapshot shares serve a frozen copy; live shares always render the note's current state.
+
+### `POST /api/highlight` — 🔒
+
+```json
+{ "language": "rust", "code": "fn main() {}" }
+```
+→ `{"html":"<pre …>…"}` (syntax-highlighted HTML for live code preview).
+
+---
+
+## 3. Folders
+
+### Folder object
+
+```json
+{ "id": "uuid", "user_id": "uuid", "name": "Work", "parent_id": null,
+  "icon": "💼", "created_at": "…", "updated_at": "…",
+  "note_count": 3, "children": [ …Folder… ] }
 ```
 
+### `GET /api/folders` — 🔒
+
+→ `{"folders":[ …tree… ]}` (nested via `children`).
+
+### `POST /api/folders` — 🔒
+
+```json
+{ "name": "Work", "parent_id": null, "icon": "💼" }
+```
+→ `201` Folder.
+
+### `PUT /api/folders/{id}` — 🔒
+
+```json
+{ "name": "…", "parent_id": null, "icon": "…" }
+```
+`parent_id` tri-state like notes (absent / null / id). Cycle moves are rejected with `400`.
+`409`? No — `400` for invalid parent, `404` unknown.
+
+### `DELETE /api/folders/{id}` — 🔒
+
+→ `{"status":"deleted","id":"…"}`. Subfolders move up one level; the folder's notes move to the top level.
+
 ---
 
-### `PUT /api/notes/:id/archive`
+## 4. Tags
 
-Toggle archive status.
+### Tag object
 
-**Response (200):**
 ```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "is_archived": true
-}
+{ "id": 1, "user_id": "uuid", "name": "kubernetes", "color": null, "note_count": 4 }
 ```
 
----
+### `GET /api/tags` — 🔒
 
-### `GET /api/notes/:id/export`
+`{"tags":[ …Tag… ]}` — all tags with note counts, sorted by name.
 
-Export a detailed note as a Markdown `.md` file download.
+### `GET /api/tags/suggest?q=ku&limit=12` — 🔒
 
-**Response:** `200` with `Content-Type: text/markdown` and `Content-Disposition: attachment; filename="meeting-notes.md"`
+Fast indexed prefix autocomplete. Empty `q` returns the most-used tags.
 
----
+### `POST /api/tags` — 🔒
 
-## 3. Reminders
-
-All reminder endpoints require authentication.
-
-### `GET /api/reminders`
-
-List reminders with filters.
-
-**Query Parameters:**
-
-| Param | Type | Default | Description |
-|:---|:---|:---|:---|
-| `state` | string | — | Filter by state: `pending`, `triggered`, `snoozed`, `acknowledged`, `dismissed` |
-| `upcoming` | bool | `false` | Only show reminders with `remind_at` in the future |
-| `note_id` | string | — | Filter reminders linked to a specific note |
-| `page` | int | `1` | Page number |
-| `limit` | int | `20` | Results per page (max 100) |
-
-**Response (200):**
 ```json
-{
-  "reminders": [
-    {
-      "id": "660e8400-e29b-41d4-a716-446655440000",
-      "note_id": "550e8400-e29b-41d4-a716-446655440000",
-      "title": "Review meeting notes",
-      "description": "Go through action items",
-      "remind_at": "2026-10-08T09:00:00Z",
-      "is_recurring": false,
-      "cron_expr": null,
-      "recur_type": null,
-      "state": "pending",
-      "snooze_until": null,
-      "created_at": "2026-10-07T20:00:00Z",
-      "updated_at": "2026-10-07T20:00:00Z",
-      "last_triggered": null
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 5,
-    "total_pages": 1
-  }
-}
+{ "name": "infra", "color": "#10b981" }
 ```
+→ `201` Tag. Creating an existing name (case-insensitive) returns the existing tag.
+
+### `PUT /api/tags/{id}` — 🔒
+
+```json
+{ "name": "k8s", "color": "#6366f1" }
+```
+→ updated Tag. `409` on name collision.
+
+### `DELETE /api/tags/{id}` — 🔒
+
+→ `200 {"status":"deleted","id":1}`. Detaches the tag from all notes (cascade).
 
 ---
 
-### `POST /api/reminders`
+## 4. Reminders
 
-Create a reminder. Can be standalone or linked to a note.
+### Reminder object
 
-**Request (one-time):**
 ```json
 {
-  "title": "Doctor appointment",
-  "description": "Annual checkup at 3pm",
-  "remind_at": "2026-10-15T14:30:00Z",
-  "note_id": null
-}
-```
-
-**Request (recurring):**
-```json
-{
-  "title": "Weekly standup",
-  "description": "Team sync every Monday at 9am",
-  "remind_at": "2026-10-13T09:00:00Z",
+  "id": "uuid",
+  "user_id": "uuid",
+  "note_id": null,
+  "title": "Standup",
+  "description": null,
+  "remind_at": "2026-10-24T09:00:00Z",
   "is_recurring": true,
-  "recur_type": "weekly",
-  "cron_expr": "0 9 * * 1",
-  "note_id": "550e8400-e29b-41d4-a716-446655440000"
+  "cron_expr": "0 9 * * 1-5",
+  "recur_type": "daily",
+  "state": "pending | triggered | snoozed | acknowledged | dismissed",
+  "snooze_until": null,
+  "channels": ["web", "telegram"],
+  "created_at": "…",
+  "updated_at": "…",
+  "last_triggered": null
 }
 ```
 
-**Recurring Presets:**
+`remind_at` is always canonical UTC (`YYYY-MM-DDTHH:MM:SSZ`). Accepted inputs on
+create/update: RFC 3339 (any offset/millis) or `datetime-local` (server-local time).
 
-| `recur_type` | `cron_expr` Example | Description |
-|:---|:---|:---|
-| `daily` | `0 9 * * *` | Every day at 9:00 AM |
-| `weekly` | `0 9 * * 1` | Every Monday at 9:00 AM |
-| `monthly` | `0 9 1 * *` | 1st of every month at 9:00 AM |
-| `custom` | `*/30 * * * *` | User-defined cron expression |
+### `GET /api/reminders?state=&note_id=&upcoming=&page=&limit=` — 🔒
 
-**Response (201):** Created reminder object
+→ `{"reminders":[ … ], "pagination": {…}}` ordered by `remind_at` ascending.
 
-**Errors:** `400` (invalid cron expression or remind_at in the past)
+### `POST /api/reminders` — 🔒
+
+```json
+{
+  "title": "Standup",
+  "description": null,
+  "remind_at": "2026-10-24T09:00:00Z",
+  "is_recurring": true,
+  "cron_expr": "0 9 * * 1-5",
+  "recur_type": "daily",
+  "note_id": null,
+  "channels": ["web", "email", "telegram"]
+}
+```
+
+- `recur_type`: `daily | weekly | monthly | custom` (presets inject a default cron).
+- `channels` default `["web"]`. `email` needs SMTP env vars; `telegram` needs
+  `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`. Unconfigured channels are skipped with a
+  server-side warning at trigger time (the reminder still triggers).
+
+### `GET /api/reminders/{id}` — 🔒 · `PUT /api/reminders/{id}` — 🔒 (partial)
+
+### `DELETE /api/reminders/{id}` — 🔒
+
+### `POST /api/reminders/{id}/snooze` — 🔒
+
+```json
+{ "duration_minutes": 15 }
+```
+→ reminder with `state:"snoozed"` and `remind_at` shifted forward.
+
+### `POST /api/reminders/{id}/acknowledge` — 🔒
+
+```json
+{ "action": "acknowledge" }
+```
+`action` = `acknowledge` (done) or `dismiss`.
 
 ---
 
-### `PUT /api/reminders/:id`
+## 6. AI Assistant
 
-Update a reminder. Partial updates supported.
+### `POST /api/ai/rewrite` — 🔒
 
-**Response (200):** Updated reminder object
+```json
+{ "text": "…", "model": "nvidia/nemotron-3.5-super-vl:free", "style": "formal" }
+```
+→ `200 {"rewritten":"…","model":"…","style":"…"}`.
+
+- Requires `AI_API_KEY` + `AI_MODELS` (otherwise `400`).
+- `model` must be in the configured allowlist.
+- `style`: `minimal | formal | casual | concise | professional | friendly`.
+- Uses an OpenAI-compatible `/chat/completions` endpoint (`AI_API_BASE`).
+- The frontend also learns availability, models and styles from `GET /api/auth/status`
+  (`ai_enabled`, `ai_models`, `ai_default_model`, `ai_styles`).
 
 ---
 
-### `DELETE /api/reminders/:id`
+## 7. WebSocket — `GET /ws`
 
-Permanently delete a reminder.
-
-**Response (200):**
-```json
-{
-  "status": "deleted",
-  "id": "660e8400-e29b-41d4-a716-446655440000"
-}
-```
-
----
-
-### `POST /api/reminders/:id/snooze`
-
-Snooze a triggered reminder.
-
-**Request:**
-```json
-{
-  "duration_minutes": 15
-}
-```
-
-Preset options: `5`, `15`, `30`, `60`, or custom value.
-
-**Response (200):**
-```json
-{
-  "id": "660e8400-e29b-41d4-a716-446655440000",
-  "state": "snoozed",
-  "snooze_until": "2026-10-08T09:15:00Z"
-}
-```
-
----
-
-### `POST /api/reminders/:id/acknowledge`
-
-Acknowledge or dismiss a triggered reminder.
-
-**Request:**
-```json
-{
-  "action": "acknowledge"
-}
-```
-
-Valid actions: `acknowledge`, `dismiss`
-
-**Response (200):**
-```json
-{
-  "id": "660e8400-e29b-41d4-a716-446655440000",
-  "state": "acknowledged"
-}
-```
-
----
-
-## 4. WebSocket
-
-### `GET /ws` → Upgrade to WebSocket
-
-Establishes a persistent WebSocket connection for real-time reminder notifications and note sync events.
-
-**Connection:** Requires valid session cookie.
-
-**Server → Client Messages:**
+Requires a session (cookie or `?token=`). Server pushes:
 
 ```json
 {
   "type": "reminder_triggered",
-  "data": {
-    "id": "660e8400-e29b-41d4-a716-446655440000",
-    "title": "Weekly standup",
-    "description": "Team sync every Monday at 9am",
-    "triggered_at": "2026-10-13T09:00:00Z",
-    "note_id": "550e8400-e29b-41d4-a716-446655440000"
-  }
+  "data": { …Reminder… }
 }
 ```
 
-```json
-{
-  "type": "note_updated",
-  "data": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "action": "updated"
-  }
-}
-```
-
-**Client → Server Messages:**
-
-```json
-{
-  "type": "ping"
-}
-```
-
----
-
-## 5. Common Error Responses
-
-All error responses follow a consistent structure:
-
-```json
-{
-  "error": "error_code",
-  "message": "Human-readable description",
-  "details": {}
-}
-```
-
-| Status | Error Code | Description |
-|:---|:---|:---|
-| `400` | `bad_request` | Invalid request body or parameters |
-| `401` | `unauthorized` | Missing or invalid authentication |
-| `404` | `not_found` | Resource not found or not owned by user |
-| `409` | `conflict` | Resource state conflict (e.g., snoozing a non-triggered reminder) |
-| `413` | `payload_too_large` | Request body exceeds size limit (1MB) |
-| `429` | `rate_limited` | Too many requests |
-| `500` | `internal_error` | Unexpected server error |
+The client shows an in-app toast + desktop notification (and the reminder engine
+simultaneously delivers the configured email/Telegram channels).

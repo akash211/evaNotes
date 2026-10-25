@@ -1,7 +1,11 @@
+pub mod folders;
 pub mod migrations;
 pub mod notes;
 pub mod reminders;
+pub mod shares;
+pub mod tags;
 pub mod users;
+pub mod versions;
 
 use crate::error::{AppError, Result};
 use r2d2::Pool;

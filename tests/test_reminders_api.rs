@@ -7,7 +7,7 @@ use evanotes::auth::OtpRateLimiter;
 use evanotes::create_app;
 use evanotes::db::users::create_or_get_user;
 use evanotes::services::reminder_engine::compute_next_cron_trigger;
-use evanotes::{AppConfig, AppState, NotificationHub};
+use evanotes::{AppConfig, AppState, NotificationHub, PresenceHub};
 use serde_json::json;
 
 fn setup_test_env() -> (
@@ -44,6 +44,7 @@ fn setup_test_env() -> (
         config,
         otp_limiter,
         hub: hub.clone(),
+        presence: PresenceHub::new(),
     };
 
     let app = create_app(state);

@@ -62,6 +62,42 @@ impl RecurType {
     }
 }
 
+/// Known reminder delivery channels.
+pub const CHANNEL_WEB: &str = "web";
+pub const CHANNEL_EMAIL: &str = "email";
+pub const CHANNEL_TELEGRAM: &str = "telegram";
+
+pub fn default_channels() -> Vec<String> {
+    vec![CHANNEL_WEB.to_string()]
+}
+
+pub fn parse_channels(raw: Option<String>) -> Vec<String> {
+    let raw = match raw {
+        Some(s) if !s.trim().is_empty() => s,
+        _ => return default_channels(),
+    };
+    match serde_json::from_str::<Vec<String>>(&raw) {
+        Ok(channels) => {
+            let mut channels: Vec<String> = channels
+                .into_iter()
+                .map(|c| c.trim().to_lowercase())
+                .filter(|c| !c.is_empty())
+                .collect();
+            channels.dedup();
+            if channels.is_empty() {
+                default_channels()
+            } else {
+                channels
+            }
+        }
+        Err(_) => default_channels(),
+    }
+}
+
+pub fn serialize_channels(channels: &[String]) -> String {
+    serde_json::to_string(channels).unwrap_or_else(|_| "[\"web\"]".to_string())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Reminder {
     pub id: String,
@@ -69,12 +105,16 @@ pub struct Reminder {
     pub note_id: Option<String>,
     pub title: String,
     pub description: Option<String>,
+    /// Canonical UTC timestamp: "YYYY-MM-DDTHH:MM:SSZ".
     pub remind_at: String,
     pub is_recurring: bool,
     pub cron_expr: Option<String>,
     pub recur_type: Option<RecurType>,
     pub state: ReminderState,
     pub snooze_until: Option<String>,
+    /// Delivery channels, e.g. ["web", "telegram"].
+    #[serde(default = "default_channels")]
+    pub channels: Vec<String>,
     pub created_at: String,
     pub updated_at: String,
     pub last_triggered: Option<String>,
@@ -90,6 +130,8 @@ pub struct CreateReminderRequest {
     pub cron_expr: Option<String>,
     pub recur_type: Option<RecurType>,
     pub note_id: Option<String>,
+    #[serde(default = "default_channels")]
+    pub channels: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -101,6 +143,7 @@ pub struct UpdateReminderRequest {
     pub cron_expr: Option<String>,
     pub recur_type: Option<RecurType>,
     pub note_id: Option<String>,
+    pub channels: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,6 +1,6 @@
 use evanotes::{
     auth::OtpRateLimiter, create_app, db::init_db, services::run_reminder_engine, AppConfig,
-    AppState, NotificationHub,
+    AppState, NotificationHub, PresenceHub,
 };
 use std::time::Duration;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -32,8 +32,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn background reminder scheduler (polling every 10 seconds)
     let engine_pool = pool.clone();
     let engine_hub = hub.clone();
+    let engine_config = config.clone();
     tokio::spawn(async move {
-        run_reminder_engine(engine_pool, engine_hub, Duration::from_secs(10)).await;
+        run_reminder_engine(
+            engine_pool,
+            engine_hub,
+            engine_config,
+            Duration::from_secs(10),
+        )
+        .await;
     });
 
     let state = AppState {
@@ -41,6 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config: config.clone(),
         otp_limiter,
         hub,
+        presence: PresenceHub::new(),
     };
 
     let app = create_app(state);

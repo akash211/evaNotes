@@ -76,12 +76,15 @@ graph LR
 
 | Step | Action | Details |
 |:---|:---|:---|
-| **Checkout** | `actions/checkout@v7` | — |
-| **Setup QEMU** | `docker/setup-qemu-action@v4` | Multi-architecture support |
-| **Setup Buildx** | `docker/setup-buildx-action@v4` | Advanced Docker builds |
-| **Docker Hub Login** | `docker/login-action@v4` | Credentials from secrets |
-| **Extract Metadata** | `docker/metadata-action@v6` | Auto-generate tags from Git |
-| **Build & Push** | `docker/build-push-action@v7` | Multi-stage, cached |
+| **Checkout** | `actions/checkout@v4` | — |
+| **Setup QEMU** | `docker/setup-qemu-action@v3` | Multi-architecture support |
+| **Setup Buildx** | `docker/setup-buildx-action@v3` | Advanced Docker builds |
+| **Docker Hub Login** | `docker/login-action@v3` | Credentials from secrets |
+| **Extract Metadata** | `docker/metadata-action@v5` | Auto-generate tags from Git |
+| **Build & Push** | `docker/build-push-action@v5` | Multi-stage, cached, **`linux/amd64,linux/arm64`** |
+
+> The release image is multi-arch because the Oracle Cloud server is ARM64 while
+> developer machines and most CI runners are amd64.
 
 ### Docker Hub Secrets
 
@@ -95,7 +98,7 @@ graph LR
 | Git Event | Docker Tags Generated |
 |:---|:---|
 | Push to `main` | `akashkece/evanotes:latest`, `akashkece/evanotes:sha-abc1234` |
-| Push tag `v0.1.0` | `akashkece/evanotes:0.1.0`, `akashkece/evanotes:0.1`, `akashkece/evanotes:sha-abc1234` |
+| Push tag `v0.1.0` | `akashkece/evanotes:latest`, `akashkece/evanotes:0.1.0`, `akashkece/evanotes:0.1`, `akashkece/evanotes:sha-abc1234` |
 | Push tag `v1.0.0` | `akashkece/evanotes:1.0.0`, `akashkece/evanotes:1.0`, `akashkece/evanotes:sha-abc1234` |
 
 ---

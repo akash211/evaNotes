@@ -7,7 +7,7 @@ use evanotes::auth::session::generate_signed_token;
 use evanotes::auth::OtpRateLimiter;
 use evanotes::create_app;
 use evanotes::db::users::{create_or_get_user, create_session};
-use evanotes::{AppConfig, AppState};
+use evanotes::{AppConfig, AppState, PresenceHub};
 use serde_json::json;
 
 fn setup_test_server() -> (TestServer, String, AppState, tempfile::TempDir) {
@@ -32,6 +32,7 @@ fn setup_test_server() -> (TestServer, String, AppState, tempfile::TempDir) {
         config,
         otp_limiter,
         hub,
+        presence: PresenceHub::new(),
     };
 
     let app = create_app(state.clone());

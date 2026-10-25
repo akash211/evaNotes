@@ -3,370 +3,548 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>evaNotes — Modern Notes & Reminders</title>
+  <meta name="color-scheme" content="dark">
+  <title>evaNotes - Notes &amp; Reminders</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-  <!-- Ambient background glow elements -->
   <div class="ambient-glow glow-1"></div>
   <div class="ambient-glow glow-2"></div>
-  <div class="ambient-glow glow-3"></div>
 
-  <!-- Main Application Wrapper -->
-  <div id="app-container" class="app-layout">
-    
-    <!-- Sidebar Navigation -->
-    <aside class="sidebar">
+  <div id="app" class="app-shell">
+
+    <!-- ============ SIDEBAR ============ -->
+    <aside id="sidebar" class="sidebar">
       <div class="sidebar-brand">
         <div class="brand-logo">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 20h9"></path>
             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
           </svg>
         </div>
         <div class="brand-info">
           <h2>evaNotes</h2>
-          <span class="version-tag">v0.1.0</span>
+          <span class="version-tag" id="version-tag">v0.1.0</span>
         </div>
       </div>
 
-      <!-- Quick Action Buttons -->
       <div class="quick-add-group">
-        <button id="btn-quick-simple" class="btn btn-primary btn-add">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          <span>Simple Note</span>
+        <button id="btn-quick-simple" class="btn btn-primary btn-add" title="New plain-text note">
+          <span class="qa-icon">📝</span><span>Simple Note</span>
         </button>
-        <button id="btn-quick-detailed" class="btn btn-glass btn-add">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-          </svg>
-          <span>Markdown Note</span>
+        <button id="btn-quick-detailed" class="btn btn-glass btn-add" title="New Markdown note">
+          <span class="qa-icon">📄</span><span>Markdown Note</span>
         </button>
-        <button id="btn-quick-reminder" class="btn btn-glass btn-add">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
-          </svg>
-          <span>Add Reminder</span>
+        <button id="btn-quick-code" class="btn btn-glass btn-add" title="New code note">
+          <span class="qa-icon">💻</span><span>Code Note</span>
+        </button>
+        <button id="btn-quick-sheet" class="btn btn-glass btn-add" title="New sheet (table) note">
+          <span class="qa-icon">🧮</span><span>Sheet Note</span>
+        </button>
+        <button id="btn-quick-reminder" class="btn btn-glass btn-add" title="Schedule a reminder">
+          <span class="qa-icon">⏰</span><span>Add Reminder</span>
         </button>
       </div>
 
-      <!-- Main Navigation Menu -->
       <nav class="nav-menu">
         <div class="nav-section-title">Navigation</div>
-        <button class="nav-item active" data-view="notes-view">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-          </svg>
+        <button class="nav-item active" data-view="notes">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           <span>All Notes</span>
           <span id="badge-total-notes" class="counter-badge">0</span>
         </button>
-
-        <button class="nav-item" data-view="reminders-view">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-          </svg>
+        <button class="nav-item" data-view="calendar">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span>Calendar</span>
+        </button>
+        <button class="nav-item" data-view="reminders">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span>Reminders</span>
           <span id="badge-pending-reminders" class="counter-badge badge-alert">0</span>
         </button>
-
-        <button class="nav-item" data-view="archived-view">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="21 8 21 21 3 21 3 8"></polyline>
-            <rect x="1" y="3" width="22" height="5"></rect>
-            <line x1="10" y1="12" x2="14" y2="12"></line>
-          </svg>
+        <button class="nav-item" data-view="archive">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
           <span>Archive</span>
         </button>
       </nav>
 
-      <!-- User Session & Connection Status Footer -->
+      <div class="folders-section">
+        <div class="section-header">
+          <span class="nav-section-title">Folders</span>
+          <button id="btn-new-folder" class="btn-icon btn-xs" title="New folder">＋</button>
+        </div>
+        <div id="sidebar-folders" class="sidebar-folders"></div>
+      </div>
+
+      <div class="tags-section">
+        <div class="nav-section-title">Tags</div>
+        <div id="sidebar-tags" class="sidebar-tags"></div>
+      </div>
+
       <div class="sidebar-footer">
-        <div class="connection-status" id="ws-indicator" title="Live WebSocket connection">
+        <div class="connection-status" id="ws-indicator" title="Live connection">
           <span class="status-dot"></span>
-          <span class="status-text">Connected</span>
+          <span class="status-text">Connecting…</span>
         </div>
         <div class="user-profile-badge" id="user-badge">
-          <div class="user-avatar" id="user-avatar-initials">U</div>
+          <div class="user-avatar" id="user-avatar-initials">?</div>
           <div class="user-meta">
-            <span class="user-email" id="user-email-display">user@example.com</span>
-            <span class="user-role" id="user-role-display">Administrator</span>
+            <span class="user-email" id="user-email-display">—</span>
+            <span class="user-role" id="user-role-display"></span>
           </div>
           <button id="btn-logout" class="btn-icon" title="Sign Out">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-              <polyline points="16 17 21 12 16 7"></polyline>
-              <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </button>
         </div>
       </div>
     </aside>
+    <div id="sidebar-backdrop" class="sidebar-backdrop hidden"></div>
 
-    <!-- Main Content Stage -->
+    <!-- ============ MAIN ============ -->
     <main class="main-content">
-      
-      <!-- Top Header & Search Bar -->
       <header class="app-header">
-        <div class="search-bar-wrapper">
-          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input type="text" id="input-search" placeholder="Search notes and reminders (press '/' to focus)..." autocomplete="off">
-          <button id="btn-clear-search" class="btn-clear hidden">&times;</button>
+        <button id="btn-menu-toggle" class="btn-icon menu-toggle" title="Menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+
+        <div class="search-bar-wrapper" id="search-wrapper">
+          <svg class="search-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="input-search" placeholder="Search notes — title, content, tags, folders…  (press /)" autocomplete="off" spellcheck="false">
+          <button id="btn-clear-search" class="btn-clear hidden" title="Clear search">&times;</button>
+          <button id="btn-search-in" class="btn-search-in" title="Choose what to search">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+          </button>
+          <div id="search-in-dropdown" class="search-in-dropdown hidden">
+            <label><input type="checkbox" data-scope="title" checked> Title</label>
+            <label><input type="checkbox" data-scope="content" checked> Content</label>
+            <label><input type="checkbox" data-scope="tags" checked> Tags</label>
+            <label><input type="checkbox" data-scope="folders" checked> Folders</label>
+          </div>
         </div>
 
         <div class="header-actions">
-          <div class="view-switch-tabs">
+          <div class="ai-header-group hidden" id="ai-header-group">
+            <span class="ai-enabled-badge" title="AI assistant enabled">✨</span>
+            <select id="ai-model-select" class="ai-model-select" title="AI model"></select>
+          </div>
+          <button id="btn-ai-toggle" class="btn btn-glass btn-sm hidden" title="Enable/disable AI rewriting">✨ AI: Off</button>
+          <div class="view-switch-tabs" id="filter-tabs">
             <button class="tab-btn active" data-filter="all">All</button>
             <button class="tab-btn" data-filter="simple">Simple</button>
             <button class="tab-btn" data-filter="detailed">Markdown</button>
-            <button class="tab-btn" data-filter="pinned">📌 Pinned</button>
+            <button class="tab-btn" data-filter="code">Code</button>
+            <button class="tab-btn" data-filter="sheet">Sheet</button>
+            <button class="tab-btn" data-filter="pinned">Pinned</button>
           </div>
         </div>
       </header>
 
-      <!-- View Container -->
       <div class="content-body">
-        
-        <!-- Notes View -->
-        <section id="notes-view" class="view-panel active">
-          <div class="view-header">
-            <div>
-              <h1 class="view-title" id="notes-view-title">All Notes</h1>
-              <p class="view-subtitle" id="notes-view-subtitle">Captured thoughts, markdown documents, and quick notes</p>
-            </div>
+        <!-- ==== NOTES VIEW ==== -->
+        <section id="view-notes" class="view-panel active">
+          <div class="quick-capture-bar">
+            <input type="text" id="input-quick-capture" class="quick-capture-input" placeholder="✏️  Quick capture — type a title and press Enter (Ctrl+Enter for Markdown)" autocomplete="off">
           </div>
 
-          <!-- Empty State -->
+          <div id="active-filters" class="active-filters hidden"></div>
+
           <div id="notes-empty-state" class="empty-state hidden">
             <div class="empty-icon">📝</div>
-            <h3>No notes found</h3>
-            <p>Create a simple plain text note or a detailed Markdown document to get started.</p>
-            <button class="btn btn-primary" onclick="app.openNoteModal('simple')">+ Create Note</button>
+            <h3 id="notes-empty-title">No notes yet</h3>
+            <p id="notes-empty-subtitle">Capture a thought above, or use the sidebar buttons.</p>
           </div>
 
-          <!-- Notes Card Grid -->
           <div id="notes-grid" class="notes-grid"></div>
 
-          <!-- Pagination Controls -->
           <div id="notes-pagination" class="pagination-bar hidden">
-            <button id="btn-prev-page" class="btn btn-glass">&larr; Previous</button>
+            <button id="btn-prev-page" class="btn btn-glass btn-sm">← Previous</button>
             <span id="pagination-info" class="page-indicator">Page 1 of 1</span>
-            <button id="btn-next-page" class="btn btn-glass">Next &rarr;</button>
+            <button id="btn-next-page" class="btn btn-glass btn-sm">Next →</button>
           </div>
         </section>
 
-        <!-- Reminders View -->
-        <section id="reminders-view" class="view-panel hidden">
+        <!-- ==== CALENDAR VIEW ==== -->
+        <section id="view-calendar" class="view-panel hidden">
           <div class="view-header">
             <div>
-              <h1 class="view-title">Reminders & Schedules</h1>
-              <p class="view-subtitle">One-time deadlines, daily standups, and recurring cron alarms</p>
+              <h1 class="view-title">Calendar</h1>
+              <p class="view-subtitle">All your reminders, pinned at their actual times</p>
             </div>
-            <button class="btn btn-primary" onclick="app.openReminderModal()">+ New Reminder</button>
+            <div class="calendar-controls">
+              <button id="btn-cal-prev" class="btn btn-glass btn-sm">←</button>
+              <button id="btn-cal-today" class="btn btn-glass btn-sm">Today</button>
+              <span id="cal-title" class="cal-title">—</span>
+              <button id="btn-cal-next" class="btn btn-glass btn-sm">→</button>
+              <div class="view-switch-tabs">
+                <button class="tab-btn active" data-cal-mode="month">Month</button>
+                <button class="tab-btn" data-cal-mode="week">Week</button>
+                <button class="tab-btn" data-cal-mode="day">Day</button>
+              </div>
+            </div>
+          </div>
+          <div id="calendar-body" class="calendar-body"></div>
+        </section>
+
+        <!-- ==== REMINDERS VIEW ==== -->
+        <section id="view-reminders" class="view-panel hidden">
+          <div class="view-header">
+            <div>
+              <h1 class="view-title">Reminders</h1>
+              <p class="view-subtitle">One-time deadlines, recurring schedules — delivered on web, email or Telegram</p>
+            </div>
+            <button class="btn btn-primary" id="btn-new-reminder">+ New Reminder</button>
           </div>
 
-          <!-- Reminder Filter Chips -->
-          <div class="filter-chips-bar">
+          <div class="filter-chips-bar" id="reminder-filters">
             <button class="chip active" data-rem-filter="all">All</button>
             <button class="chip" data-rem-filter="pending">Pending</button>
             <button class="chip" data-rem-filter="snoozed">Snoozed</button>
-            <button class="chip" data-rem-filter="acknowledged">Acknowledged</button>
+            <button class="chip" data-rem-filter="triggered">Triggered</button>
+            <button class="chip" data-rem-filter="acknowledged">Done</button>
           </div>
 
           <div id="reminders-empty-state" class="empty-state hidden">
             <div class="empty-icon">⏰</div>
-            <h3>No reminders set</h3>
-            <p>Schedule a one-time reminder or a recurring event to keep you on track.</p>
-            <button class="btn btn-primary" onclick="app.openReminderModal()">+ Set Reminder</button>
+            <h3>No reminders</h3>
+            <p>Schedule a one-time or recurring reminder to stay on track.</p>
           </div>
 
           <div id="reminders-list" class="reminders-list"></div>
         </section>
 
-        <!-- Archived Notes View -->
-        <section id="archived-view" class="view-panel hidden">
+        <!-- ==== ARCHIVE VIEW ==== -->
+        <section id="view-archive" class="view-panel hidden">
           <div class="view-header">
             <div>
               <h1 class="view-title">Archived Notes</h1>
-              <p class="view-subtitle">Notes that have been tucked away</p>
+              <p class="view-subtitle">Tucked away, but still searchable</p>
             </div>
           </div>
-          <div id="archived-grid" class="notes-grid"></div>
+          <div id="archive-empty-state" class="empty-state hidden">
+            <div class="empty-icon">📦</div>
+            <h3>Nothing archived</h3>
+            <p>Notes you archive will live here.</p>
+          </div>
+          <div id="archive-grid" class="notes-grid"></div>
         </section>
-
       </div>
     </main>
   </div>
 
-  <!-- Note Editor Modal -->
+  <!-- ============ NOTE EDITOR MODAL ============ -->
   <div id="modal-note" class="modal-overlay hidden">
     <div class="modal-dialog modal-editor">
       <div class="modal-header">
         <div class="modal-title-wrap">
-          <span id="editor-type-badge" class="type-badge badge-simple">Simple Note</span>
-          <input type="text" id="note-title-input" class="input-bare title-input" placeholder="Note Title...">
+          <button id="btn-note-icon" class="btn-icon note-icon-btn" title="Assign a symbol">🏷</button>
+          <input type="text" id="note-title-input" class="input-bare title-input" placeholder="Note title…" autocomplete="off">
         </div>
         <div class="modal-controls">
+          <div class="type-segmented" id="editor-type-seg">
+            <button data-note-type="simple">Simple</button>
+            <button data-note-type="detailed">MD</button>
+            <button data-note-type="code">Code</button>
+            <button data-note-type="sheet">Sheet</button>
+          </div>
           <div class="color-picker-group" id="color-picker-group">
             <button class="color-dot active" data-color="" title="Default"></button>
-            <button class="color-dot" data-color="#6366f1" style="background: #6366f1;" title="Indigo"></button>
-            <button class="color-dot" data-color="#10b981" style="background: #10b981;" title="Emerald"></button>
-            <button class="color-dot" data-color="#f59e0b" style="background: #f59e0b;" title="Amber"></button>
-            <button class="color-dot" data-color="#f43f5e" style="background: #f43f5e;" title="Rose"></button>
-            <button class="color-dot" data-color="#06b6d4" style="background: #06b6d4;" title="Cyan"></button>
+            <button class="color-dot" data-color="#6366f1" style="background:#6366f1" title="Indigo"></button>
+            <button class="color-dot" data-color="#10b981" style="background:#10b981" title="Emerald"></button>
+            <button class="color-dot" data-color="#f59e0b" style="background:#f59e0b" title="Amber"></button>
+            <button class="color-dot" data-color="#f43f5e" style="background:#f43f5e" title="Rose"></button>
+            <button class="color-dot" data-color="#06b6d4" style="background:#06b6d4" title="Cyan"></button>
+            <button class="color-dot" data-color="#a855f7" style="background:#a855f7" title="Purple"></button>
           </div>
-          <button id="btn-export-md" class="btn btn-glass btn-sm" title="Export as .md file">Export .md</button>
-          <button class="btn-close" onclick="app.closeNoteModal()">&times;</button>
+          <button class="btn-close" id="btn-close-note" title="Close">&times;</button>
         </div>
       </div>
 
+      <div id="presence-banner" class="presence-banner hidden"></div>
+
       <div class="modal-body editor-body">
-        <!-- Markdown formatting toolbar (visible in detailed mode) -->
+        <div class="editor-meta-row">
+          <div class="folder-picker-wrap">
+            <label class="meta-label">Folder</label>
+            <select id="note-folder-select" class="form-control form-control-sm"></select>
+          </div>
+          <div class="tag-editor">
+            <label class="meta-label">Tags</label>
+            <div class="tag-editor-row">
+              <div id="note-tags-chips" class="tag-chips"></div>
+              <input type="text" id="note-tags-input" class="tag-input" placeholder="Add tags…" autocomplete="off">
+              <div id="tag-suggest-dropdown" class="tag-suggest-dropdown hidden"></div>
+            </div>
+          </div>
+          <div class="code-lang-wrap hidden" id="code-lang-wrap">
+            <label class="meta-label">Language</label>
+            <select id="code-lang-select" class="form-control form-control-sm"></select>
+          </div>
+        </div>
+        <div id="tag-suggested-row" class="tag-suggested-row"></div>
+
         <div id="markdown-toolbar" class="markdown-toolbar hidden">
           <button type="button" class="tool-btn" data-insert="# " title="Heading">H</button>
           <button type="button" class="tool-btn" data-insert="**" data-wrap="true" title="Bold"><strong>B</strong></button>
           <button type="button" class="tool-btn" data-insert="*" data-wrap="true" title="Italic"><em>I</em></button>
-          <button type="button" class="tool-btn" data-insert="`" data-wrap="true" title="Code"><code>&lt;&gt;</code></button>
-          <button type="button" class="tool-btn" data-insert="- " title="Bullet List">• List</button>
-          <button type="button" class="tool-btn" data-insert="1. " title="Numbered List">1. List</button>
-          <button type="button" class="tool-btn" data-insert="- [ ] " title="Task Checklist">☑ Task</button>
-          <button type="button" class="tool-btn" data-insert="> " title="Blockquote">Quote</button>
-          <button type="button" class="tool-btn" data-insert="[Link](url)" title="Link">Link</button>
+          <button type="button" class="tool-btn" data-insert="`" data-wrap="true" title="Inline code"><code>&lt;/&gt;</code></button>
+          <button type="button" class="tool-btn" data-insert="```&#10;```" title="Code block">𝄃</button>
+          <button type="button" class="tool-btn" data-insert="```mermaid&#10;flowchart TD&#10;    A[Start] --> B[End]&#10;```" title="Flowchart (mermaid)">🕸</button>
+          <button type="button" class="tool-btn" data-insert="- " title="Bullet list">• List</button>
+          <button type="button" class="tool-btn" data-insert="1. " title="Numbered list">1. List</button>
+          <button type="button" class="tool-btn" data-insert="- [ ] " title="Task">☑ Task</button>
+          <button type="button" class="tool-btn" data-insert="> " title="Quote">❝</button>
+          <button type="button" class="tool-btn" data-insert="[text](https://)" title="Link">🔗</button>
+          <button type="button" class="tool-btn" data-insert="---" data-line="true" title="Divider">—</button>
         </div>
 
-        <div class="editor-panes">
-          <!-- Raw content pane -->
+        <!-- Sheet toolbar -->
+        <div id="sheet-toolbar" class="sheet-toolbar hidden">
+          <button id="btn-sheet-paste" class="btn btn-glass btn-sm">📋 Paste from Excel/Sheets</button>
+          <button id="btn-sheet-add-row" class="btn btn-glass btn-sm">+ Row</button>
+          <button id="btn-sheet-add-col" class="btn btn-glass btn-sm">+ Column</button>
+          <button id="btn-sheet-del-row" class="btn btn-glass btn-sm">− Row</button>
+          <button id="btn-sheet-del-col" class="btn btn-glass btn-sm">− Column</button>
+        </div>
+        <div id="sheet-editor" class="sheet-editor hidden"></div>
+
+        <div class="editor-panes" id="editor-panes">
           <div class="pane raw-pane">
-            <textarea id="note-content-input" placeholder="Write your note here... (Markdown supported)"></textarea>
+            <textarea id="note-content-input" placeholder="Write here…" spellcheck="false"></textarea>
           </div>
-          <!-- Live Markdown preview pane (visible in detailed mode) -->
           <div id="preview-pane" class="pane preview-pane markdown-rendered hidden"></div>
         </div>
       </div>
 
       <div class="modal-footer">
         <div class="footer-left">
-          <button id="btn-delete-note" class="btn btn-danger btn-sm hidden">Delete Note</button>
-          <button id="btn-pin-note" class="btn btn-glass btn-sm">📌 Pin</button>
+          <button id="btn-delete-note" class="btn btn-danger btn-sm hidden">Delete</button>
+          <button id="btn-pin-note" class="btn btn-glass btn-sm">📍 Pin</button>
           <button id="btn-archive-note" class="btn btn-glass btn-sm">Archive</button>
+          <button id="btn-versions" class="btn btn-glass btn-sm hidden">🕘 Versions</button>
+          <button id="btn-share-note" class="btn btn-glass btn-sm hidden">🔗 Share</button>
+          <div class="export-menu-wrap">
+            <button id="btn-export-menu" class="btn btn-glass btn-sm hidden">⬇ Export ▾</button>
+            <div id="export-dropdown" class="export-dropdown hidden">
+              <button data-export-format="md">Download .md</button>
+              <button data-export-format="pdf">Download PDF</button>
+            </div>
+          </div>
         </div>
         <div class="footer-right">
-          <button class="btn btn-glass" onclick="app.closeNoteModal()">Cancel</button>
+          <span id="autosave-indicator" class="autosave-indicator"></span>
+          <div id="ai-editor-group" class="ai-editor-group hidden">
+            <select id="ai-style-select" class="ai-style-select" title="Rewrite style"></select>
+            <button id="btn-ai-rewrite" class="btn btn-glass btn-sm" title="Rewrite the whole note with AI">✨ Rewrite</button>
+          </div>
+          <button class="btn btn-glass" id="btn-cancel-note">Cancel</button>
           <button id="btn-save-note" class="btn btn-primary">Save Note</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Reminder Modal -->
+  <!-- Icon picker popover -->
+  <div id="icon-picker-popover" class="icon-picker-popover hidden">
+    <div class="icon-picker-header"><span>Assign a symbol</span><button id="btn-icon-none" class="btn btn-glass btn-xs">None</button></div>
+    <div id="icon-picker-grid" class="icon-picker-grid"></div>
+  </div>
+
+  <!-- ============ REMINDER MODAL ============ -->
   <div id="modal-reminder" class="modal-overlay hidden">
     <div class="modal-dialog modal-sm">
       <div class="modal-header">
-        <h3>Schedule Reminder</h3>
-        <button class="btn-close" onclick="app.closeReminderModal()">&times;</button>
+        <h3 id="reminder-modal-title">Schedule Reminder</h3>
+        <button class="btn-close" id="btn-close-reminder">&times;</button>
       </div>
       <div class="modal-body form-layout">
         <div class="form-group">
           <label for="rem-title-input">Title</label>
-          <input type="text" id="rem-title-input" class="form-control" placeholder="What do you need to remember?">
+          <input type="text" id="rem-title-input" class="form-control" placeholder="What should you remember?" autocomplete="off">
         </div>
-
         <div class="form-group">
-          <label for="rem-desc-input">Description (Optional)</label>
-          <textarea id="rem-desc-input" class="form-control" rows="2" placeholder="Additional details, checklist, etc."></textarea>
+          <label for="rem-desc-input">Description (optional)</label>
+          <textarea id="rem-desc-input" class="form-control" rows="2" placeholder="Extra context…"></textarea>
         </div>
-
         <div class="form-group">
-          <label for="rem-time-input">Trigger Date & Time</label>
+          <label for="rem-time-input">Date &amp; time</label>
           <input type="datetime-local" id="rem-time-input" class="form-control">
         </div>
-
         <div class="form-group">
           <label for="rem-recur-select">Repeat</label>
           <select id="rem-recur-select" class="form-control">
-            <option value="none">Does not repeat (One-time)</option>
+            <option value="none">Does not repeat</option>
             <option value="daily">Every day (9:00 AM)</option>
-            <option value="weekly">Every week (Monday 9:00 AM)</option>
-            <option value="monthly">Every month (1st day 9:00 AM)</option>
-            <option value="custom">Custom Cron Expression</option>
+            <option value="weekly">Every week (Mon 9:00 AM)</option>
+            <option value="monthly">Every month (1st, 9:00 AM)</option>
+            <option value="custom">Custom cron</option>
           </select>
         </div>
-
         <div id="rem-custom-cron-group" class="form-group hidden">
-          <label for="rem-cron-input">Cron Expression</label>
-          <input type="text" id="rem-cron-input" class="form-control" placeholder="0 9 * * 1-5">
-          <small class="form-hint">Standard 5-field cron: min hour day month weekday</small>
+          <label for="rem-cron-input">Cron expression</label>
+          <input type="text" id="rem-cron-input" class="form-control mono" placeholder="0 9 * * 1-5">
+          <small class="form-hint">5-field cron: minute hour day month weekday</small>
         </div>
-
         <div class="form-group">
-          <label for="rem-note-select">Attach to Note (Optional)</label>
+          <label>Notify me via</label>
+          <div class="channel-checkboxes">
+            <label class="channel-check"><input type="checkbox" id="ch-web" value="web" checked disabled> <span class="channel-label"><span class="channel-icon">🌐</span> Web (browser)</span></label>
+            <label class="channel-check"><input type="checkbox" id="ch-email" value="email"> <span class="channel-label"><span class="channel-icon">✉️</span> Email <em id="ch-email-note" class="channel-note"></em></span></label>
+            <label class="channel-check"><input type="checkbox" id="ch-telegram" value="telegram"> <span class="channel-label"><span class="channel-icon">✈️</span> Telegram <em id="ch-telegram-note" class="channel-note"></em></span></label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="rem-note-select">Attach to note (optional)</label>
           <select id="rem-note-select" class="form-control">
             <option value="">No note linked</option>
           </select>
         </div>
       </div>
-
       <div class="modal-footer">
-        <button class="btn btn-glass" onclick="app.closeReminderModal()">Cancel</button>
+        <button class="btn btn-glass" id="btn-cancel-reminder">Cancel</button>
         <button id="btn-save-reminder" class="btn btn-primary">Save Reminder</button>
       </div>
     </div>
   </div>
 
-  <!-- Authentication Gateway Modal (shown if unauthenticated) -->
+  <!-- ============ FOLDER MODAL ============ -->
+  <div id="modal-folder" class="modal-overlay hidden">
+    <div class="modal-dialog modal-xs">
+      <div class="modal-header">
+        <h3 id="folder-modal-title">New Folder</h3>
+        <button class="btn-close" id="btn-close-folder">&times;</button>
+      </div>
+      <div class="modal-body form-layout">
+        <div class="form-group">
+          <label for="folder-name-input">Name</label>
+          <input type="text" id="folder-name-input" class="form-control" placeholder="Folder name" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="folder-parent-select">Inside folder</label>
+          <select id="folder-parent-select" class="form-control">
+            <option value="">Top level</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Symbol</label>
+          <button id="btn-folder-icon" class="btn btn-glass btn-sm" style="justify-content:flex-start">🏷 None</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-glass" id="btn-cancel-folder">Cancel</button>
+        <button id="btn-save-folder" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ VERSIONS MODAL ============ -->
+  <div id="modal-versions" class="modal-overlay hidden">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-header">
+        <h3>Version History</h3>
+        <button class="btn-close" id="btn-close-versions">&times;</button>
+      </div>
+      <div class="modal-body" id="versions-body">
+        <p class="versions-hint">Automatic snapshots (at least 15 minutes apart, last 10 kept).</p>
+        <div id="versions-list" class="versions-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger btn-sm" id="btn-versions-clear">Clear all versions</button>
+        <button class="btn btn-glass" id="btn-versions-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SHARE MODAL ============ -->
+  <div id="modal-share" class="modal-overlay hidden">
+    <div class="modal-dialog modal-xs">
+      <div class="modal-header">
+        <h3>Share Note</h3>
+        <button class="btn-close" id="btn-close-share">&times;</button>
+      </div>
+      <div class="modal-body form-layout">
+        <p class="share-hint">Anyone with the link can view the note in a browser (with PDF / Markdown download).</p>
+        <div class="share-modes">
+          <button id="btn-share-live" class="share-mode-card">
+            <span class="share-mode-title">🔄 Always updated</span>
+            <span class="share-mode-desc">The link always shows the latest version of the note.</span>
+          </button>
+          <button id="btn-share-snapshot" class="share-mode-card">
+            <span class="share-mode-title">📸 Current version</span>
+            <span class="share-mode-desc">A frozen copy — later edits won't change the link.</span>
+          </button>
+        </div>
+        <div id="share-link-row" class="share-link-row hidden">
+          <label>Public link</label>
+          <div class="share-link-box">
+            <input type="text" id="share-link-input" class="form-control" readonly>
+            <button id="btn-copy-share" class="btn btn-primary btn-sm">Copy</button>
+          </div>
+          <div class="share-link-actions">
+            <button id="btn-open-share" class="btn btn-glass btn-sm">Open ↗</button>
+            <button id="btn-revoke-share" class="btn btn-danger btn-sm">Revoke link</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-glass" id="btn-close-share2">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SHEET PASTE MODAL ============ -->
+  <div id="modal-sheet-paste" class="modal-overlay hidden">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-header">
+        <h3>Paste from Excel / Google Sheets</h3>
+        <button class="btn-close" id="btn-close-sheet-paste">&times;</button>
+      </div>
+      <div class="modal-body form-layout">
+        <p class="share-hint">Copy cells from your spreadsheet and paste below (columns separated by tabs).</p>
+        <textarea id="sheet-paste-input" class="form-control mono" rows="10" placeholder="Item	Cost&#10;Milk	2.50&#10;Bread	1.20"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-glass" id="btn-cancel-sheet-paste">Cancel</button>
+        <button id="btn-apply-sheet-paste" class="btn btn-primary">Import</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ AUTH MODAL ============ -->
   <div id="modal-auth" class="modal-overlay hidden">
     <div class="modal-dialog modal-auth-card">
       <div class="auth-header">
         <div class="brand-logo large">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="M12 20h9"></path>
-            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-          </svg>
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
         </div>
         <h2>Welcome to evaNotes</h2>
-        <p>Sign in with your authorized Google Account or Email OTP to manage your notes and reminders.</p>
+        <p id="auth-subtitle">Sign in to manage your notes and reminders.</p>
       </div>
 
-      <!-- Google Sign-In Container -->
       <div id="google-auth-container" class="google-auth-section hidden">
-        <div id="g_id_onload"></div>
-        <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
-        <div class="auth-divider"><span>or sign in with email OTP</span></div>
+        <div id="google-btn-container"></div>
+        <div class="auth-divider"><span>or sign in with a one-time code</span></div>
       </div>
 
-      <!-- Email OTP Flow -->
       <div class="auth-otp-section">
         <div id="otp-step-1">
           <div class="form-group">
-            <label for="auth-email-input">Admin Email</label>
-            <input type="email" id="auth-email-input" class="form-control" placeholder="admin@example.com" autocomplete="email">
+            <label for="auth-email-input">Email</label>
+            <input type="email" id="auth-email-input" class="form-control" placeholder="you@example.com" autocomplete="email">
           </div>
           <button id="btn-request-otp" class="btn btn-primary btn-block">Send Verification Code</button>
         </div>
 
         <div id="otp-step-2" class="hidden">
           <div class="form-group">
-            <label for="auth-code-input">6-Digit Code</label>
-            <input type="text" id="auth-code-input" class="form-control code-input" placeholder="123456" maxlength="6" autocomplete="one-time-code">
-            <small id="otp-instruction" class="form-hint">Code sent to your email (or Docker logs if SMTP is unconfigured).</small>
+            <label for="auth-code-input">6-digit code</label>
+            <input type="text" id="auth-code-input" class="form-control code-input" placeholder="123456" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+            <small id="otp-instruction" class="form-hint">Code sent to your email (or the server console if SMTP is unconfigured).</small>
           </div>
           <div class="btn-row">
-            <button id="btn-resend-otp" class="btn btn-glass">Change Email</button>
+            <button id="btn-resend-otp" class="btn btn-glass">← Change email</button>
             <button id="btn-verify-otp" class="btn btn-primary">Sign In</button>
           </div>
         </div>
@@ -376,10 +554,21 @@
     </div>
   </div>
 
-  <!-- Real-time Reminder Toast Notification Banner -->
+  <!-- ============ CONFIRM MODAL ============ -->
+  <div id="modal-confirm" class="modal-overlay hidden">
+    <div class="modal-dialog modal-xs">
+      <div class="modal-body confirm-body">
+        <p id="confirm-message">Are you sure?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-glass" id="btn-confirm-cancel">Cancel</button>
+        <button class="btn btn-danger" id="btn-confirm-ok">Yes</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast-container" class="toast-container"></div>
 
-  <!-- Core App Logic -->
   <script src="/app.js"></script>
 </body>
 </html>

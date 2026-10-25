@@ -1,20 +1,34 @@
 use crate::models::reminder::Reminder;
 use serde_json::json;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 
-#[derive(Clone)]
+/// Per-user notification fan-out. Events are only ever delivered to WebSocket
+/// clients belonging to the same user, so one account can never observe
+/// another account's reminder content.
+#[derive(Clone, Default)]
 pub struct NotificationHub {
-    tx: broadcast::Sender<String>,
+    channels: Arc<Mutex<HashMap<String, broadcast::Sender<String>>>>,
 }
 
 impl NotificationHub {
     pub fn new() -> Self {
-        let (tx, _rx) = broadcast::channel(128);
-        Self { tx }
+        Self::default()
     }
 
-    pub fn subscribe(&self) -> broadcast::Receiver<String> {
-        self.tx.subscribe()
+    fn sender_for(&self, user_id: &str) -> broadcast::Sender<String> {
+        let mut map = self.channels.lock().unwrap();
+        map.entry(user_id.to_string())
+            .or_insert_with(|| {
+                let (tx, _rx) = broadcast::channel(64);
+                tx
+            })
+            .clone()
+    }
+
+    pub fn subscribe(&self, user_id: &str) -> broadcast::Receiver<String> {
+        self.sender_for(user_id).subscribe()
     }
 
     pub fn broadcast_reminder(&self, reminder: &Reminder) {
@@ -24,22 +38,22 @@ impl NotificationHub {
         })
         .to_string();
 
-        let _ = self.tx.send(msg);
+        let map = self.channels.lock().unwrap();
+        if let Some(tx) = map.get(&reminder.user_id) {
+            let _ = tx.send(msg);
+        }
     }
 
-    pub fn broadcast_event(&self, event_type: &str, data: serde_json::Value) {
+    pub fn broadcast_event(&self, user_id: &str, event_type: &str, data: serde_json::Value) {
         let msg = json!({
             "type": event_type,
             "data": data
         })
         .to_string();
 
-        let _ = self.tx.send(msg);
-    }
-}
-
-impl Default for NotificationHub {
-    fn default() -> Self {
-        Self::new()
+        let map = self.channels.lock().unwrap();
+        if let Some(tx) = map.get(user_id) {
+            let _ = tx.send(msg);
+        }
     }
 }

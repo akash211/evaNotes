@@ -6,6 +6,7 @@ use crate::models::reminder::{
     SnoozeReminderRequest, UpdateReminderRequest,
 };
 use crate::services::reminder_engine::compute_next_cron_trigger;
+use crate::services::time::normalize_remind_at;
 use crate::AppState;
 use axum::{
     extract::{Path, Query, State},
@@ -42,7 +43,7 @@ pub async fn list_reminders(
 
     let (list, total) = reminders::list_reminders(&conn, &user.id, &filter)?;
     let page = filter.page.unwrap_or(1).max(1);
-    let limit = filter.limit.unwrap_or(20).clamp(1, 100);
+    let limit = filter.limit.unwrap_or(50).clamp(1, 200);
     let total_pages = if total == 0 {
         1
     } else {
@@ -73,6 +74,9 @@ pub async fn create_reminder(
             "remind_at timestamp is required".into(),
         ));
     }
+
+    // Normalize to canonical UTC format before storage
+    req.remind_at = normalize_remind_at(&req.remind_at)?;
 
     // Convert recurring presets to cron expression if needed
     if req.is_recurring && req.cron_expr.is_none() {
@@ -119,8 +123,12 @@ pub async fn update_reminder(
     State(state): State<AppState>,
     AuthUser(user): AuthUser,
     Path(id): Path<String>,
-    Json(req): Json<UpdateReminderRequest>,
+    Json(mut req): Json<UpdateReminderRequest>,
 ) -> Result<impl IntoResponse> {
+    if let Some(ref remind_at) = req.remind_at {
+        req.remind_at = Some(normalize_remind_at(remind_at)?);
+    }
+
     if let Some(true) = req.is_recurring {
         if let Some(ref expr) = req.cron_expr {
             if compute_next_cron_trigger(expr).is_none() {

@@ -22,6 +22,9 @@ fn test_database_initialization_and_migrations() {
     assert!(tables.contains(&"otps".to_string()));
     assert!(tables.contains(&"notes".to_string()));
     assert!(tables.contains(&"reminders".to_string()));
+    assert!(tables.contains(&"tags".to_string()));
+    assert!(tables.contains(&"note_tags".to_string()));
+    assert!(tables.contains(&"notes_fts".to_string()));
 }
 
 #[test]
@@ -85,19 +88,22 @@ fn test_otp_lifecycle() {
 #[test]
 fn test_notes_crud_and_features() {
     let pool = init_memory_db().unwrap();
-    let conn = pool.get().unwrap();
+    let mut conn = pool.get().unwrap();
 
     let user = users::create_or_get_user(&conn, "notes_user@test.com", "otp", false).unwrap();
 
     // 1. Create simple note
     let note1 = notes::create_note(
-        &conn,
+        &mut conn,
         &user.id,
         CreateNoteRequest {
             title: "Quick Grocery List".into(),
             content: "Milk, Bread, Butter".into(),
             note_type: NoteType::Simple,
             color: Some("#10b981".into()),
+            icon: None,
+            folder_id: None,
+            tags: Vec::new(),
         },
     )
     .unwrap();
@@ -108,13 +114,16 @@ fn test_notes_crud_and_features() {
 
     // 2. Create detailed markdown note
     let note2 = notes::create_note(
-        &conn,
+        &mut conn,
         &user.id,
         CreateNoteRequest {
             title: "Project Architecture".into(),
             content: "# High Level Design\n- Rust Axum\n- SQLite".into(),
             note_type: NoteType::Detailed,
             color: None,
+            icon: None,
+            folder_id: None,
+            tags: Vec::new(),
         },
     )
     .unwrap();
@@ -127,7 +136,7 @@ fn test_notes_crud_and_features() {
 
     // 4. Update note
     let updated = notes::update_note(
-        &conn,
+        &mut conn,
         &user.id,
         &note1.id,
         UpdateNoteRequest {
@@ -135,6 +144,8 @@ fn test_notes_crud_and_features() {
             content: Some("Milk, Bread, Butter, Coffee".into()),
             ..Default::default()
         },
+        0,
+        10,
     )
     .unwrap();
     assert_eq!(updated.title, "Updated Grocery List");
@@ -164,17 +175,20 @@ fn test_notes_crud_and_features() {
 #[test]
 fn test_reminders_crud_and_lifecycle() {
     let pool = init_memory_db().unwrap();
-    let conn = pool.get().unwrap();
+    let mut conn = pool.get().unwrap();
 
     let user = users::create_or_get_user(&conn, "remind_user@test.com", "otp", false).unwrap();
     let note = notes::create_note(
-        &conn,
+        &mut conn,
         &user.id,
         CreateNoteRequest {
             title: "Doctor Checkup".into(),
             content: "Check blood pressure".into(),
             note_type: NoteType::Simple,
             color: None,
+            icon: None,
+            folder_id: None,
+            tags: Vec::new(),
         },
     )
     .unwrap();
@@ -192,6 +206,7 @@ fn test_reminders_crud_and_lifecycle() {
             cron_expr: None,
             recur_type: None,
             note_id: Some(note.id.clone()),
+            channels: vec!["web".to_string()],
         },
     )
     .unwrap();
@@ -218,12 +233,14 @@ fn test_reminders_crud_and_lifecycle() {
             cron_expr: Some("0 9 * * 1-5".into()),
             recur_type: Some(RecurType::Daily),
             note_id: None,
+            channels: vec!["web".to_string(), "telegram".to_string()],
         },
     )
     .unwrap();
 
     assert!(rem2.is_recurring);
     assert_eq!(rem2.recur_type, Some(RecurType::Daily));
+    assert_eq!(rem2.channels, vec!["web", "telegram"]);
 
     // 3. Snooze reminder
     let snoozed = reminders::snooze_reminder(&conn, &user.id, &rem1.id, 15).unwrap();
@@ -243,20 +260,23 @@ fn test_reminders_crud_and_lifecycle() {
 #[test]
 fn test_security_idor_and_sql_injection() {
     let pool = init_memory_db().unwrap();
-    let conn = pool.get().unwrap();
+    let mut conn = pool.get().unwrap();
 
     let user_a = users::create_or_get_user(&conn, "user_a@test.com", "otp", false).unwrap();
     let user_b = users::create_or_get_user(&conn, "user_b@test.com", "otp", false).unwrap();
 
     // User A creates a private note
     let note_a = notes::create_note(
-        &conn,
+        &mut conn,
         &user_a.id,
         CreateNoteRequest {
             title: "User A Confidential".into(),
             content: "Secret data".into(),
             note_type: NoteType::Simple,
             color: None,
+            icon: None,
+            folder_id: None,
+            tags: Vec::new(),
         },
     )
     .unwrap();
@@ -267,13 +287,15 @@ fn test_security_idor_and_sql_injection() {
 
     // IDOR Check 2: User B cannot update User A's note
     let update_res = notes::update_note(
-        &conn,
+        &mut conn,
         &user_b.id,
         &note_a.id,
         UpdateNoteRequest {
             title: Some("Hacked Title".into()),
             ..Default::default()
         },
+        0,
+        10,
     );
     assert!(update_res.is_err());
 
@@ -285,13 +307,16 @@ fn test_security_idor_and_sql_injection() {
     // SQL Injection Check: Injection payload in title and content
     let injection_payload = "'; DROP TABLE notes; --";
     let injection_note = notes::create_note(
-        &conn,
+        &mut conn,
         &user_a.id,
         CreateNoteRequest {
             title: injection_payload.into(),
             content: injection_payload.into(),
             note_type: NoteType::Simple,
             color: None,
+            icon: None,
+            folder_id: None,
+            tags: Vec::new(),
         },
     )
     .unwrap();

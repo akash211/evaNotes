@@ -3,8 +3,15 @@ target/
 **/*.rs.bk
 
 # Environment & Secrets
+# Ignore every .env variant, but keep the documented template tracked.
 .env
+.env.*
+!.env.example
 *.env.local
+*.pem
+*.key
+secrets.toml
+credentials.toml
 
 # Databases & Local runtime data
 data/
@@ -12,6 +19,7 @@ data/
 *.db-shm
 *.db-wal
 ~/.evanotes/
+*.log
 
 # AI documentation & local knowledge
 AGENTS.md

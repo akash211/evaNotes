@@ -1,10 +1,38 @@
 use crate::error::{AppError, Result};
 use crate::models::reminder::{
-    CreateReminderRequest, RecurType, Reminder, ReminderFilter, ReminderState,
-    UpdateReminderRequest,
+    parse_channels, serialize_channels, CreateReminderRequest, RecurType, Reminder, ReminderFilter,
+    ReminderState, UpdateReminderRequest,
 };
 use rusqlite::{params, params_from_iter, Connection, OptionalExtension, ToSql};
 use uuid::Uuid;
+
+fn reminder_from_row(row: &rusqlite::Row) -> rusqlite::Result<Reminder> {
+    let recur_type_str: Option<String> = row.get(8)?;
+    let state_str: String = row.get(9)?;
+    let channels_raw: String = row.get(14)?;
+
+    Ok(Reminder {
+        id: row.get(0)?,
+        user_id: row.get(1)?,
+        note_id: row.get(2)?,
+        title: row.get(3)?,
+        description: row.get(4)?,
+        remind_at: row.get(5)?,
+        is_recurring: row.get::<_, i32>(6)? == 1,
+        cron_expr: row.get(7)?,
+        recur_type: recur_type_str.as_deref().and_then(RecurType::from_str_opt),
+        state: ReminderState::from_str_opt(&state_str),
+        snooze_until: row.get(10)?,
+        channels: parse_channels(Some(channels_raw)),
+        created_at: row.get(11)?,
+        updated_at: row.get(12)?,
+        last_triggered: row.get(13)?,
+    })
+}
+
+const REMINDER_COLUMNS: &str = "id, user_id, note_id, title, description, remind_at,
+        is_recurring, cron_expr, recur_type, state, snooze_until,
+        created_at, updated_at, last_triggered, channels";
 
 pub fn create_reminder(
     conn: &Connection,
@@ -13,11 +41,12 @@ pub fn create_reminder(
 ) -> Result<Reminder> {
     let id = Uuid::new_v4().to_string();
     let recur_type_str = req.recur_type.map(|r| r.as_str());
+    let channels = serialize_channels(&req.channels);
 
     conn.execute(
         "INSERT INTO reminders (id, user_id, note_id, title, description, remind_at,
-                                is_recurring, cron_expr, recur_type, state, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'pending', datetime('now'), datetime('now'))",
+                                is_recurring, cron_expr, recur_type, state, channels, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'pending', ?10, datetime('now'), datetime('now'))",
         params![
             id,
             user_id,
@@ -28,6 +57,7 @@ pub fn create_reminder(
             if req.is_recurring { 1 } else { 0 },
             req.cron_expr,
             recur_type_str,
+            channels,
         ],
     )?;
 
@@ -40,36 +70,14 @@ pub fn get_reminder_by_id(
     user_id: &str,
     reminder_id: &str,
 ) -> Result<Option<Reminder>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, user_id, note_id, title, description, remind_at,
-                is_recurring, cron_expr, recur_type, state, snooze_until,
-                created_at, updated_at, last_triggered
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {REMINDER_COLUMNS}
          FROM reminders
-         WHERE id = ?1 AND user_id = ?2",
-    )?;
+         WHERE id = ?1 AND user_id = ?2"
+    ))?;
 
     let reminder = stmt
-        .query_row(params![reminder_id, user_id], |row| {
-            let recur_type_str: Option<String> = row.get(8)?;
-            let state_str: String = row.get(9)?;
-
-            Ok(Reminder {
-                id: row.get(0)?,
-                user_id: row.get(1)?,
-                note_id: row.get(2)?,
-                title: row.get(3)?,
-                description: row.get(4)?,
-                remind_at: row.get(5)?,
-                is_recurring: row.get::<_, i32>(6)? == 1,
-                cron_expr: row.get(7)?,
-                recur_type: recur_type_str.as_deref().and_then(RecurType::from_str_opt),
-                state: ReminderState::from_str_opt(&state_str),
-                snooze_until: row.get(10)?,
-                created_at: row.get(11)?,
-                updated_at: row.get(12)?,
-                last_triggered: row.get(13)?,
-            })
-        })
+        .query_row(params![reminder_id, user_id], reminder_from_row)
         .optional()?;
 
     Ok(reminder)
@@ -81,7 +89,7 @@ pub fn list_reminders(
     filter: &ReminderFilter,
 ) -> Result<(Vec<Reminder>, i64)> {
     let page = filter.page.unwrap_or(1).max(1);
-    let limit = filter.limit.unwrap_or(20).clamp(1, 100);
+    let limit = filter.limit.unwrap_or(50).clamp(1, 200);
     let offset = (page - 1) * limit;
 
     let state_str = filter.state.map(|s| s.as_str().to_string());
@@ -109,20 +117,14 @@ pub fn list_reminders(
             count_params.push(Box::new(note_id.clone()));
         }
         if upcoming_only {
-            count_query.push_str(" AND remind_at > datetime('now')");
+            count_query.push_str(" AND remind_at > strftime('%Y-%m-%dT%H:%M:%SZ','now')");
         }
 
         let mut stmt = conn.prepare(&count_query)?;
         stmt.query_row(params_from_iter(count_params.iter()), |r| r.get(0))?
     };
 
-    let mut data_query = String::from(
-        "SELECT id, user_id, note_id, title, description, remind_at,
-                is_recurring, cron_expr, recur_type, state, snooze_until,
-                created_at, updated_at, last_triggered
-         FROM reminders
-         WHERE user_id = ?1",
-    );
+    let mut data_query = format!("SELECT {REMINDER_COLUMNS} FROM reminders WHERE user_id = ?1");
     let mut data_params: Vec<Box<dyn ToSql>> = vec![Box::new(user_id.to_string())];
     let mut idx = 1;
 
@@ -137,40 +139,22 @@ pub fn list_reminders(
         data_params.push(Box::new(note_id));
     }
     if upcoming_only {
-        data_query.push_str(" AND remind_at > datetime('now')");
+        data_query.push_str(" AND remind_at > strftime('%Y-%m-%dT%H:%M:%SZ','now')");
     }
 
     idx += 1;
     data_query.push_str(&format!(" ORDER BY remind_at ASC LIMIT ?{idx}"));
-    data_params.push(Box::new(limit));
+    data_params.push(Box::new(limit as i64));
 
     idx += 1;
     data_query.push_str(&format!(" OFFSET ?{idx}"));
-    data_params.push(Box::new(offset));
+    data_params.push(Box::new(offset as i64));
 
     let mut stmt = conn.prepare(&data_query)?;
 
     let rows: Vec<Reminder> = stmt
         .query_map(params_from_iter(data_params.iter()), |row| {
-            let recur_type_str: Option<String> = row.get(8)?;
-            let s_str: String = row.get(9)?;
-
-            Ok(Reminder {
-                id: row.get(0)?,
-                user_id: row.get(1)?,
-                note_id: row.get(2)?,
-                title: row.get(3)?,
-                description: row.get(4)?,
-                remind_at: row.get(5)?,
-                is_recurring: row.get::<_, i32>(6)? == 1,
-                cron_expr: row.get(7)?,
-                recur_type: recur_type_str.as_deref().and_then(RecurType::from_str_opt),
-                state: ReminderState::from_str_opt(&s_str),
-                snooze_until: row.get(10)?,
-                created_at: row.get(11)?,
-                updated_at: row.get(12)?,
-                last_triggered: row.get(13)?,
-            })
+            reminder_from_row(row)
         })?
         .filter_map(std::result::Result::ok)
         .collect();
@@ -195,13 +179,17 @@ pub fn update_reminder(
     let recur_type = req.recur_type.or(existing.recur_type);
     let recur_type_str = recur_type.map(|r| r.as_str());
     let note_id = req.note_id.or(existing.note_id);
+    let channels = req
+        .channels
+        .map(|c| serialize_channels(&c))
+        .unwrap_or_else(|| serialize_channels(&existing.channels));
 
     conn.execute(
         "UPDATE reminders
          SET title = ?1, description = ?2, remind_at = ?3,
              is_recurring = ?4, cron_expr = ?5, recur_type = ?6,
-             note_id = ?7, updated_at = datetime('now')
-         WHERE id = ?8 AND user_id = ?9",
+             note_id = ?7, channels = ?8, updated_at = datetime('now')
+         WHERE id = ?9 AND user_id = ?10",
         params![
             title.trim(),
             description,
@@ -210,6 +198,7 @@ pub fn update_reminder(
             cron_expr,
             recur_type_str,
             note_id,
+            channels,
             reminder_id,
             user_id
         ],
@@ -248,8 +237,8 @@ pub fn snooze_reminder(
     conn.execute(
         "UPDATE reminders
          SET state = 'snoozed',
-             snooze_until = datetime('now', ?1),
-             remind_at = datetime('now', ?1),
+             snooze_until = strftime('%Y-%m-%dT%H:%M:%SZ','now', ?1),
+             remind_at = strftime('%Y-%m-%dT%H:%M:%SZ','now', ?1),
              updated_at = datetime('now')
          WHERE id = ?2 AND user_id = ?3",
         params![modifier, reminder_id, user_id],
@@ -286,37 +275,15 @@ pub fn acknowledge_reminder(
 }
 
 pub fn get_due_reminders(conn: &Connection) -> Result<Vec<Reminder>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, user_id, note_id, title, description, remind_at,
-                is_recurring, cron_expr, recur_type, state, snooze_until,
-                created_at, updated_at, last_triggered
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {REMINDER_COLUMNS}
          FROM reminders
          WHERE (state = 'pending' OR state = 'snoozed')
-           AND remind_at <= datetime('now')",
-    )?;
+           AND remind_at <= strftime('%Y-%m-%dT%H:%M:%SZ','now')"
+    ))?;
 
     let reminders = stmt
-        .query_map([], |row| {
-            let recur_type_str: Option<String> = row.get(8)?;
-            let s_str: String = row.get(9)?;
-
-            Ok(Reminder {
-                id: row.get(0)?,
-                user_id: row.get(1)?,
-                note_id: row.get(2)?,
-                title: row.get(3)?,
-                description: row.get(4)?,
-                remind_at: row.get(5)?,
-                is_recurring: row.get::<_, i32>(6)? == 1,
-                cron_expr: row.get(7)?,
-                recur_type: recur_type_str.as_deref().and_then(RecurType::from_str_opt),
-                state: ReminderState::from_str_opt(&s_str),
-                snooze_until: row.get(10)?,
-                created_at: row.get(11)?,
-                updated_at: row.get(12)?,
-                last_triggered: row.get(13)?,
-            })
-        })?
+        .query_map([], reminder_from_row)?
         .filter_map(std::result::Result::ok)
         .collect();
 

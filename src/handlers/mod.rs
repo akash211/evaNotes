@@ -1,6 +1,10 @@
+pub mod ai;
 pub mod auth;
+pub mod folders;
 pub mod notes;
+pub mod public_share;
 pub mod reminders;
+pub mod tags;
 pub mod ws;
 
 use crate::auth::AuthUser;

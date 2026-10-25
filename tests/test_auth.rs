@@ -6,7 +6,7 @@ use evanotes::auth::session::generate_signed_token;
 use evanotes::auth::OtpRateLimiter;
 use evanotes::create_app;
 use evanotes::db::users::get_latest_active_otp;
-use evanotes::{AppConfig, AppState};
+use evanotes::{AppConfig, AppState, PresenceHub};
 use serde_json::json;
 
 fn setup_test_app(
@@ -16,6 +16,8 @@ fn setup_test_app(
     let mut config = AppConfig::from_env();
     config.admin_email = admin_email.map(String::from);
     config.session_secret = "test-secret-32-chars-long-abcdefghijk".to_string();
+    // Deterministic rate-limit behavior for tests
+    config.otp_rate_limit_max = 2;
 
     let otp_limiter = OtpRateLimiter::new();
     let hub = evanotes::NotificationHub::new();
@@ -24,6 +26,7 @@ fn setup_test_app(
         config: config.clone(),
         otp_limiter,
         hub,
+        presence: PresenceHub::new(),
     };
 
     let app = create_app(state);

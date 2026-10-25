@@ -1,5 +1,7 @@
 use axum_test::TestServer;
-use evanotes::{auth::OtpRateLimiter, create_app, db::init_memory_db, AppConfig, AppState};
+use evanotes::{
+    auth::OtpRateLimiter, create_app, db::init_memory_db, AppConfig, AppState, PresenceHub,
+};
 
 #[tokio::test]
 async fn test_health_check_status_endpoint() {
@@ -13,6 +15,7 @@ async fn test_health_check_status_endpoint() {
         config,
         otp_limiter,
         hub,
+        presence: PresenceHub::new(),
     };
 
     let app = create_app(state);

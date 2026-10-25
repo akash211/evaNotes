@@ -35,6 +35,28 @@ pub struct GoogleLoginPayload {
     pub id_token: String,
 }
 
+/// Resolve the real client IP. Behind Cloudflare Tunnel the trustworthy value is
+/// `CF-Connecting-IP`; `X-Forwarded-For` is only a fallback (its *last* entry is
+/// the one appended by the nearest proxy — earlier entries are client-controlled).
+fn client_ip(headers: &HeaderMap) -> String {
+    for name in ["cf-connecting-ip", "x-real-ip"] {
+        if let Some(ip) = headers
+            .get(name)
+            .and_then(|h| h.to_str().ok())
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            return ip.to_string();
+        }
+    }
+    if let Some(xff) = headers.get("x-forwarded-for").and_then(|h| h.to_str().ok()) {
+        if let Some(last) = xff.split(',').map(str::trim).rfind(|s| !s.is_empty()) {
+            return last.to_string();
+        }
+    }
+    "127.0.0.1".to_string()
+}
+
 pub async fn request_otp(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -48,23 +70,14 @@ pub async fn request_otp(
     }
 
     // Determine client IP for rate limiting
-    let client_ip = headers
-        .get("x-forwarded-for")
-        .and_then(|h| h.to_str().ok())
-        .and_then(|s| s.split(',').next())
-        .map(|s| s.trim().to_string())
-        .unwrap_or_else(|| {
-            headers
-                .get("x-real-ip")
-                .and_then(|h| h.to_str().ok())
-                .map(|s| s.trim().to_string())
-                .unwrap_or_else(|| "127.0.0.1".to_string())
-        });
+    let client_ip = client_ip(&headers);
 
-    // Check rate limiter: max 2 requests per 60 seconds
-    state
-        .otp_limiter
-        .check_and_record(&client_ip, 2, Duration::from_secs(60))?;
+    // Check rate limiter: max N requests per 60 seconds (configurable)
+    state.otp_limiter.check_and_record(
+        &client_ip,
+        state.config.otp_rate_limit_max as usize,
+        Duration::from_secs(60),
+    )?;
 
     // Check admin authorization if ADMIN_EMAIL is set
     if let Some(admin) = &state.config.admin_email {
@@ -77,7 +90,10 @@ pub async fn request_otp(
     }
 
     let code = generate_otp_code();
-    let expires_at = (chrono::Utc::now() + chrono::Duration::minutes(5)).to_rfc3339();
+    // Stored in UTC "YYYY-MM-DD HH:MM:SS" so it compares exactly with SQLite datetime('now')
+    let expires_at = (chrono::Utc::now() + chrono::Duration::minutes(5))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
 
     {
         let conn = state.pool.get()?;
@@ -98,6 +114,7 @@ pub async fn request_otp(
 
 pub async fn verify_otp(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(payload): Json<OtpVerifyPayload>,
 ) -> Result<Response> {
     let email = payload.email.trim().to_lowercase();
@@ -108,6 +125,13 @@ pub async fn verify_otp(
             "Email and verification code are required".into(),
         ));
     }
+
+    // Throttle guessing attempts per client IP (separate namespace from OTP sends)
+    state.otp_limiter.check_and_record(
+        &format!("verify:{}", client_ip(&headers)),
+        10,
+        Duration::from_secs(60),
+    )?;
 
     if let Some(admin) = &state.config.admin_email {
         if !email.eq_ignore_ascii_case(admin) {
@@ -149,7 +173,9 @@ pub async fn verify_otp(
     update_last_login(&conn, &user.id)?;
 
     let token = generate_signed_token(&user.id, &state.config.session_secret);
-    let expires_at = (chrono::Utc::now() + chrono::Duration::days(30)).to_rfc3339();
+    let expires_at = (chrono::Utc::now() + chrono::Duration::days(30))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
     create_session(&conn, &token, &user.id, &expires_at)?;
 
     let cookie = build_session_cookie(&token, state.config.secure_cookies, 30);
@@ -201,7 +227,9 @@ pub async fn google_login(
     update_last_login(&conn, &user.id)?;
 
     let token = generate_signed_token(&user.id, &state.config.session_secret);
-    let expires_at = (chrono::Utc::now() + chrono::Duration::days(30)).to_rfc3339();
+    let expires_at = (chrono::Utc::now() + chrono::Duration::days(30))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
     create_session(&conn, &token, &user.id, &expires_at)?;
 
     let cookie = build_session_cookie(&token, state.config.secure_cookies, 30);
@@ -281,6 +309,12 @@ pub async fn auth_status(
         "is_admin": is_admin,
         "user_id": user_id,
         "google_login_enabled": state.config.google_client_id.is_some(),
-        "google_client_id": state.config.google_client_id
+        "google_client_id": state.config.google_client_id,
+        "telegram_enabled": crate::services::notify::telegram_configured(&state.config),
+        "email_enabled": crate::services::notify::email_configured(&state.config),
+        "ai_enabled": crate::services::ai::ai_configured(&state.config),
+        "ai_models": state.config.ai_models,
+        "ai_default_model": state.config.ai_default_model,
+        "ai_styles": crate::models::ai::AI_STYLES.iter().map(|(id, label)| json!({"id": id, "label": label})).collect::<Vec<_>>()
     })))
 }

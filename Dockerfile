@@ -3,7 +3,7 @@
 # ==============================================================================
 
 # --- Stage 1: Build release binary ---
-FROM rust:1.85-slim-bookworm AS builder
+FROM rust:1-slim-bookworm AS builder
 
 WORKDIR /usr/src/app
 
@@ -19,11 +19,14 @@ COPY Cargo.toml Cargo.lock ./
 # Copy migrations (embedded at compile-time by refinery)
 COPY migrations ./migrations
 
+# Copy embedded font assets (required by include_bytes! in services/pdf.rs)
+COPY assets ./assets
+
 # Copy application source code
 COPY src ./src
 
-# Build production release binary
-RUN cargo build --release --bin evanotes
+# Build production release binary (--locked guarantees reproducible deps)
+RUN cargo build --release --locked --bin evanotes
 
 # --- Stage 2: Minimal hardened runtime ---
 FROM debian:bookworm-slim AS runtime
@@ -48,6 +51,9 @@ COPY --from=builder /usr/src/app/target/release/evanotes /usr/local/bin/evanotes
 
 # Copy static frontend assets
 COPY --from=builder /usr/src/app/src/web/static ./src/web/static
+
+# Embed the DejaVu font license notice (required for redistribution)
+COPY assets/fonts/LICENSE /usr/share/doc/evanotes/fonts-LICENSE
 
 # Switch to unprivileged user
 USER evanotes
